@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+pyyaml
+requests
+httpx
+anthropic
+tavily-python
+biopython
