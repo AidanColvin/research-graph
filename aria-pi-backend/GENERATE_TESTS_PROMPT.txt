@@ -1,0 +1,20 @@
+Role: Senior Python QA Automation Engineer.
+Task: Write comprehensive pytest files for the ARIA-PI backend.
+
+Architecture Context:
+This is a clinical research intelligence pipeline. The backend uses FastAPI, Pydantic dataclasses, and modular API clients. 
+
+Test Requirements:
+1. Framework: Use `pytest` and `pytest-asyncio`.
+2. Coverage: Write tests for all data clients (PubMed, ClinicalTrials, SEC EDGAR) and utility functions (SourceTagger).
+3. Mocking: Use `unittest.mock` to mock external API calls. Do not hit live endpoints during tests.
+4. Core Focus: The tests must rigorously verify the system's ability to support clinical validation. Ensure the `SourceTagger` tests strictly enforce the two-source minimum rule and properly apply the `[UNVERIFIED]` flag.
+5. Formatting: Every test function must include a clear, concise docstring in plain English using the exact format:
+    """
+    Takes: [Inputs]
+    Does: [Action being tested]
+    Returns: [Expected output or assertion]
+    """
+
+Output formatting:
+Provide the response as raw, pasteable bash commands using `cat << 'EOF' > path/to/file` so I can directly paste the generated tests into my terminal.

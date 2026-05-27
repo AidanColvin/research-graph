@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Carolina Data Warehouse for Health (CDWH)",
+    "description": "Central repository containing clinical, research, and administrative data from the UNC Health Care System.",
+    "relevance_keywords": ["electronic health records", "ehr", "clinical informatics", "patient cohorts"]
+  },
+  {
+    "name": "Rural Health Data Cohorts",
+    "description": "Extensive longitudinal data representing rural patient populations across North Carolina.",
+    "relevance_keywords": ["rural health", "population health", "demographics"]
+  }
+]
