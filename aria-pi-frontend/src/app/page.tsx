@@ -13,6 +13,25 @@ const STAGES = [
   'Verification',
 ];
 
+// Canonical sectors the backend understands — used for inline autocomplete.
+const SECTORS = [
+  'Oncology', 'Biotech', 'Pharmaceutical', 'Ag-Bio', 'Medtech', 'Rural Health',
+  'Technology', 'Software', 'Artificial Intelligence', 'Semiconductors',
+  'Cybersecurity', 'Cloud Computing', 'Fintech', 'Quantum Computing', 'Robotics',
+  'Telecom', 'Climate Tech', 'Energy', 'Automotive', 'Aerospace', 'Consumer',
+  'Retail', 'Finance', 'Industrial',
+];
+
+// First sector whose name starts with what's typed (case-insensitive).
+function suggestFor(input: string): string {
+  const q = input.trim().toLowerCase();
+  if (!q) return '';
+  const m = SECTORS.find(
+    (s) => s.toLowerCase().startsWith(q) && s.toLowerCase() !== q
+  );
+  return m ?? '';
+}
+
 export default function Home() {
   const [sector, setSector] = useState('');
   const [status, setStatus] = useState<Status>('idle');
@@ -65,6 +84,25 @@ export default function Home() {
     setStageIdx(0);
   }
 
+  // Inline autocomplete: ghost suffix shown after what the user typed.
+  const suggestion = suggestFor(sector);
+  const suffix = suggestion ? suggestion.slice(sector.length) : '';
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const atEnd = e.currentTarget.selectionStart === sector.length;
+    if (e.key === 'Tab' && suffix) {
+      e.preventDefault();
+      setSector(suggestion);
+    } else if (e.key === 'ArrowRight' && suffix && atEnd) {
+      e.preventDefault();
+      setSector(suggestion);
+    } else if (e.key === 'Enter' && suffix) {
+      // First Enter completes the word; a second Enter (no suffix) submits.
+      e.preventDefault();
+      setSector(suggestion);
+    }
+  }
+
   return (
     <main style={styles.main}>
       <header style={styles.header}>
@@ -83,13 +121,22 @@ export default function Home() {
           <p style={styles.sub}>Name a sector. Get a source-cited partnership report.</p>
 
           <form onSubmit={(e) => { e.preventDefault(); run(); }} style={styles.inputWrap}>
-            <input
-              autoFocus
-              value={sector}
-              onChange={(e) => setSector(e.target.value)}
-              placeholder="Oncology"
-              style={styles.input}
-            />
+            <div style={styles.inputField}>
+              <div aria-hidden style={styles.ghost}>
+                <span style={styles.ghostTyped}>{sector}</span>
+                <span style={styles.ghostSuffix}>{suffix}</span>
+              </div>
+              <input
+                autoFocus
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Oncology"
+                style={styles.input}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
             <button
               type="submit"
               disabled={!sector.trim()}
@@ -98,6 +145,12 @@ export default function Home() {
               Generate →
             </button>
           </form>
+
+          {suffix && (
+            <p style={styles.tabHint}>
+              Press <kbd style={styles.kbd}>Tab</kbd> to complete “{suggestion}”
+            </p>
+          )}
 
           <div style={styles.examples}>
             {['Oncology', 'Quantum Computing', 'Climate Tech', 'Biotech', 'Rural Health'].map((s) => (
@@ -204,7 +257,48 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #0a0a0a',
     paddingBottom: 14,
   },
-  input: { flex: 1, fontSize: 28, fontWeight: 400, letterSpacing: '-0.01em' },
+  inputField: { position: 'relative', flex: 1, display: 'flex', alignItems: 'center' },
+  input: {
+    width: '100%',
+    fontSize: 28,
+    fontWeight: 400,
+    letterSpacing: '-0.01em',
+    lineHeight: 1.3,
+    padding: 0,
+    background: 'transparent',
+    position: 'relative',
+    zIndex: 1,
+  },
+  ghost: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: 28,
+    fontWeight: 400,
+    letterSpacing: '-0.01em',
+    lineHeight: 1.3,
+    padding: 0,
+    whiteSpace: 'pre',
+    pointerEvents: 'none',
+    zIndex: 0,
+    overflow: 'hidden',
+  },
+  ghostTyped: { color: 'transparent' },
+  ghostSuffix: { color: '#c9c9c9' },
+  tabHint: { marginTop: 14, fontSize: 13, color: '#999' },
+  kbd: {
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: 11,
+    padding: '2px 6px',
+    border: '1px solid #ddd',
+    borderRadius: 4,
+    background: '#fafafa',
+    color: '#666',
+  },
   cta: {
     fontSize: 16,
     fontWeight: 600,
