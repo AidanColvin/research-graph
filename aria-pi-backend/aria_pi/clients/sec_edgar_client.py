@@ -4,6 +4,7 @@ Uses two SEC endpoints:
   1. efts.sec.gov/LATEST/search-index  — full-text filing search
   2. data.sec.gov/submissions/CIK{cik}.json  — rich company submissions
 """
+import re
 import time
 import requests
 from datetime import date
@@ -79,21 +80,51 @@ class SECEdgarClient:
         active = _active_cik_titles()
         if not active:
             return []
-        # Bias toward live filers: last ~4 fiscal years of 10-K business
-        # descriptions. Phrase-quote multi-word terms for precision.
-        q = f'"{term}"' if " " in term else term
         start = date(date.today().year - 4, 1, 1).isoformat()
         end = date.today().isoformat()
 
-        # Pull a few pages so we can RANK companies by how often the term
-        # appears in their filings. A company whose 10-Ks repeatedly match the
-        # term is far more on-topic than one with a single incidental mention
-        # (which is how noise like "Vail Resorts" for "pasta" used to slip in).
-        #
-        # The first page is fetched exactly like a plain single query (no
-        # `from`) because that form is the most reliable; SEC's efts endpoint
-        # intermittently 500s on paginated/rapid requests, so extra pages are
-        # strictly best-effort and a later failure never discards earlier hits.
+        # Try progressively broader queries and stop at the first that yields
+        # real companies. A precise phrase ("craft beer") is best when it hits,
+        # but many niche terms never appear verbatim in a 10-K; rather than fall
+        # back to a generic default list, we relax to the bare words and then to
+        # the head noun ("beer") so the report still covers on-topic filers.
+        for q in self._discovery_queries(term):
+            ranked = self._rank_for_query(q, active, start, end, limit)
+            if ranked:
+                return ranked
+        return []
+
+    @staticmethod
+    def _discovery_queries(term: str) -> List[str]:
+        """Ordered, de-duplicated query variants from precise to broad."""
+        attempts: List[str] = []
+        if " " in term:
+            attempts.append(f'"{term}"')   # exact phrase — highest precision
+            attempts.append(term)          # all words, any position
+            tokens = [t for t in re.split(r"[^A-Za-z0-9]+", term) if len(t) > 2]
+            if tokens:
+                attempts.append(tokens[-1])           # head noun ("beer")
+                longest = max(tokens, key=len)
+                attempts.append(longest)              # most distinctive token
+        else:
+            attempts.append(term)
+        seen: set = set()
+        return [a for a in attempts if not (a in seen or seen.add(a))]
+
+    def _rank_for_query(self, q: str, active: dict, start: str, end: str,
+                        limit: int) -> List[str]:
+        """Run one efts query over recent 10-Ks and rank matched live filers.
+
+        Pulls a few pages so companies can be RANKED by how often the term
+        appears in their filings — a company whose 10-Ks repeatedly match is far
+        more on-topic than one with a single incidental mention (which is how
+        noise like "Vail Resorts" for "pasta" used to slip in).
+
+        The first page is fetched as a plain query (no `from`) because that form
+        is the most reliable; SEC's efts endpoint intermittently 500s on
+        paginated/rapid requests, so extra pages are strictly best-effort and a
+        later failure never discards earlier hits.
+        """
         freq: dict[int, int] = {}
         order: list[int] = []
 
@@ -122,7 +153,7 @@ class SECEdgarClient:
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
-                print(f"SEC discovery error for '{term}' (page {page}): {e}")
+                print(f"SEC discovery error for {q!r} (page {page}): {e}")
                 if page == 0:
                     return []  # genuine failure — nothing to rank
                 break          # keep whatever earlier pages returned
