@@ -712,25 +712,13 @@ export default function Report({ data: rawData }: { data: any }) {
         ))}
       </section>
 
-      {/* SECTION 7 */}
-      <section style={styles.section}>
-        <H2 n={7} title="Verification Checklist" />
-        <ul style={styles.checklist}>
-          {(data.section7_verification || []).map((item, i) => (
-            <li key={i} style={styles.checkItem}>
-              <span style={{ ...styles.checkbox, background: item.checked ? '#0a0a0a' : '#fff' }}>
-                {item.checked ? '✓' : ''}
-              </span>
-              <span>{item.label}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* Section 7 (verification checklist) is computed by the backend for
+          every report but intentionally not rendered to the public page. */}
 
       {/* REFERENCES — AMA */}
       {citations.list.length > 0 && (
         <section style={styles.section}>
-          <H2 n={8} title="References" />
+          <H2 n={7} title="References" />
           <p style={styles.refNote}>Citations follow AMA Manual of Style (11th ed.).</p>
           <ol style={styles.refList}>
             {citations.list.map((r) => (
