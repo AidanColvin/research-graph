@@ -19,14 +19,10 @@ import uvicorn
 
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
+from aria_pi.clients.pubmed_client import PubMedClient
+from aria_pi.clients.nih_reporter_client import NIHReporterClient
 from aria_pi.builders.report_builder import ReportBuilder
 from aria_pi.utils.source_tagger import SourceTagger
-
-try:
-    from aria_pi.clients.pubmed_client import PubMedClient
-    HAS_PUBMED = True
-except Exception:
-    HAS_PUBMED = False
 
 
 app = FastAPI(title="ARIA-PI Orchestrator", version="0.3.0")
@@ -91,7 +87,8 @@ async def run_pipeline(req: PipelineRequest):
         trials = ClinicalTrialsClient()
         tagger = SourceTagger()
         builder = ReportBuilder()
-        pubmed = PubMedClient() if HAS_PUBMED else None
+        pubmed = PubMedClient()
+        nih = NIHReporterClient()
 
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds = _seeds_for(req.sector, override)
@@ -110,18 +107,23 @@ async def run_pipeline(req: PipelineRequest):
                 print(f"Trials lookup failed for {name}: {e}")
                 company_trials = []
             papers: list = []
-            if pubmed:
-                try:
-                    papers = pubmed.search_by_affiliation(
-                        query=name, affiliation="UNC Chapel Hill", max_results=3
-                    )
-                except Exception as e:
-                    print(f"PubMed lookup failed for {name}: {e}")
+            try:
+                papers = pubmed.search_unc_with_company(name, max_results=4)
+            except Exception as e:
+                print(f"PubMed lookup failed for {name}: {e}")
+
+            grants: list = []
+            try:
+                grants = nih.unc_grants_mentioning(name, max_results=4)
+            except Exception as e:
+                print(f"NIH Reporter lookup failed for {name}: {e}")
+
             company_data.append({
                 "name": name,
                 "facts": facts,
                 "trials": company_trials[:6],
                 "pubmed": papers,
+                "nih_grants": grants,
             })
 
         # 2. Deterministic synthesis

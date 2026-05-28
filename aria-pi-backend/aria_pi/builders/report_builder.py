@@ -87,58 +87,103 @@ class ReportBuilder:
         }
 
     def _section2(self, sector: str, companies: List[dict]) -> dict:
-        # UNC faculty — pull from any PubMed UNC-affiliated hits we gathered
-        unc_faculty: List[dict] = []
-        seen_authors = set()
+        # ── Known partnerships: NIH-funded UNC grants mentioning the company
+        # AND/OR co-authored PubMed publications. Both are publicly disclosed
+        # signals universities track under COI / research-integrity policy.
+        known: List[dict] = []
         for c in companies:
-            for paper in (c.get("pubmed") or [])[:5]:
-                for author in (paper.get("authors") or [])[:3]:
-                    if author and author not in seen_authors:
-                        seen_authors.add(author)
-                        unc_faculty.append({
-                            "name": author,
-                            "school": "UNC (verify school via faculty page)",
-                            "research_focus": paper.get("title", "")[:160],
-                            "sources": [paper.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
-                                        "https://www.unc.edu"],
-                        })
-                if len(unc_faculty) >= 8:
-                    break
-
-        # Data assets — relevance-filter against sector keywords
-        sector_words = set(sector.lower().split())
-        data_assets = []
-        for d in self.datasets:
-            kws = set([k.lower() for k in d.get("relevance_keywords", [])])
-            relevant = any(w in " ".join(kws) for w in sector_words) or len(self.datasets) < 4
-            if relevant:
-                data_assets.append({
-                    "name": d["name"],
-                    "description": d["description"],
-                    "held_by": d.get("held_by", "UNC"),
-                    "sources": d.get("sources", []),
-                })
-
-        # Known partnerships — derived from PubMed UNC hits per company
-        known = []
-        for c in companies:
-            papers = c.get("pubmed") or []
-            if papers:
-                p = papers[0]
+            cname = c["name"]
+            for g in (c.get("nih_grants") or [])[:3]:
+                dept = g.get("department") or g.get("organization") or "UNC Chapel Hill"
                 known.append({
-                    "company": c["name"],
-                    "unc_unit": "UNC (per PubMed affiliation)",
-                    "relationship_type": "Co-authored publication",
+                    "company": cname,
+                    "unc_unit": dept,
+                    "relationship_type": f"NIH-funded research — grant {g.get('project_num', '')} "
+                                         f"(PI: {g.get('pi', 'n/a')})",
+                    "active": "Yes" if g.get("fiscal_year") else "Unknown",
+                    "sources": [g.get("url", "https://reporter.nih.gov"),
+                                "https://research.unc.edu/coi"],
+                })
+            for p in (c.get("pubmed") or [])[:2]:
+                known.append({
+                    "company": cname,
+                    "unc_unit": "UNC Chapel Hill (per PubMed affiliation)",
+                    "relationship_type": f"Co-authored publication ({p.get('year', 'n.d.')}) — "
+                                         f"{p.get('journal', '')}",
                     "active": "Unknown",
                     "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
-                                "https://www.unc.edu"],
+                                "https://research.unc.edu/coi"],
+                })
+
+        # ── UNC faculty: PIs from NIH grants (named + departmental) plus
+        # first authors of co-authored PubMed papers.
+        unc_faculty: List[dict] = []
+        seen = set()
+
+        def add_faculty(name: str, school: str, focus: str, sources: List[str]):
+            key = (name.lower().strip(), focus[:60])
+            if not name or key in seen:
+                return
+            seen.add(key)
+            unc_faculty.append({
+                "name": name, "school": school,
+                "research_focus": focus[:200], "sources": sources,
+            })
+
+        for c in companies:
+            for g in (c.get("nih_grants") or [])[:3]:
+                pi = g.get("pi") or ""
+                if pi:
+                    add_faculty(
+                        pi,
+                        g.get("department") or g.get("organization") or "UNC Chapel Hill",
+                        f"NIH-funded research overlapping with {c['name']}: "
+                        f"{g.get('title', '')[:120]}",
+                        [g.get("url", "https://reporter.nih.gov"),
+                         "https://research.unc.edu"],
+                    )
+            for p in (c.get("pubmed") or [])[:3]:
+                authors = p.get("authors") or []
+                if authors:
+                    add_faculty(
+                        authors[0],
+                        "UNC Chapel Hill (verify school via faculty page)",
+                        f"Co-authored publication with {c['name']}: "
+                        f"{p.get('title', '')[:120]}",
+                        [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
+                         "https://www.unc.edu"],
+                    )
+            if len(unc_faculty) >= 10:
+                break
+
+        # ── Data assets: show all curated UNC datasets (analysts filter, not us).
+        data_assets = [
+            {"name": d["name"], "description": d["description"],
+             "held_by": d.get("held_by", "UNC"), "sources": d.get("sources", [])}
+            for d in self.datasets
+        ]
+
+        # ── Risk flags: any active NIH grant = active partnership = outreach risk
+        risk_flags: List[dict] = []
+        for c in companies:
+            grants = c.get("nih_grants") or []
+            active = [g for g in grants if str(g.get("fiscal_year", ""))][:1]
+            if active:
+                g = active[0]
+                risk_flags.append({
+                    "company": c["name"],
+                    "risk": f"Active NIH grant — {g.get('project_num', '')} "
+                            f"(FY{g.get('fiscal_year', '')}, PI {g.get('pi', 'n/a')}) — "
+                            "verify with UNC OSP before outreach",
+                    "sources": [g.get("url", "https://reporter.nih.gov"),
+                                "https://research.unc.edu/osp"],
                 })
 
         return {
             "known_partnerships": known,
             "unc_faculty": unc_faculty,
             "data_assets": data_assets,
-            "risk_flags": [],
+            "risk_flags": risk_flags,
         }
 
     def _section3(self, companies: List[dict]) -> dict:
@@ -345,7 +390,11 @@ class ReportBuilder:
                 add(p.get("title", "Publication")[:120],
                     p.get("url", ""), p.get("journal", "PubMed"),
                     p.get("year", ""))
-        return refs[:20]
+            for g in (c.get("nih_grants") or [])[:2]:
+                add(f"{g.get('project_num', 'Grant')} — {g.get('title', '')[:100]}",
+                    g.get("url", ""), "NIH Reporter",
+                    str(g.get("fiscal_year", "")))
+        return refs[:30]
 
 
 def _first_trial_url(c: dict) -> str:
