@@ -112,17 +112,28 @@ async def run_pipeline(req: PipelineRequest):
             except Exception as e:
                 print(f"PubMed lookup failed for {name}: {e}")
 
+            coi_papers: list = []
+            try:
+                coi_papers = pubmed.search_coi_disclosures(name, max_results=3)
+            except Exception as e:
+                print(f"PubMed COI lookup failed for {name}: {e}")
+
             grants: list = []
             try:
                 grants = nih.unc_grants_mentioning(name, max_results=4)
             except Exception as e:
                 print(f"NIH Reporter lookup failed for {name}: {e}")
 
+            # ClinicalTrials.gov collaborators where UNC appears = direct partnership.
+            unc_trials = [t for t in company_trials if t.get("unc_signal")]
+
             company_data.append({
                 "name": name,
                 "facts": facts,
                 "trials": company_trials[:6],
+                "unc_trials": unc_trials,
                 "pubmed": papers,
+                "pubmed_coi": coi_papers,
                 "nih_grants": grants,
             })
 

@@ -33,6 +33,22 @@ class PubMedClient:
                 f' OR "UNC Chapel Hill"[Affiliation])')
         return self._run(term, max_results)
 
+    def search_coi_disclosures(self, company_name: str, max_results: int = 3) -> List[dict]:
+        """Find UNC-authored papers that disclose a relationship with the company.
+
+        Journals require COI disclosures (consulting fees, equity, research
+        funding) in the body of the paper. Searching `<company> AND
+        ("conflict of interest" OR "disclosure" OR "funding")` against a UNC
+        affiliation surfaces these public disclosures.
+        """
+        term = (f'("{company_name}"[Title/Abstract])'
+                f' AND ("conflict of interest"[Title/Abstract]'
+                f'      OR "disclosure"[Title/Abstract]'
+                f'      OR "funding"[Title/Abstract])'
+                f' AND ("University of North Carolina"[Affiliation]'
+                f'      OR "UNC Chapel Hill"[Affiliation])')
+        return self._run(term, max_results)
+
     def search_by_affiliation(self, query: str, affiliation: str, max_results: int = 5) -> List[dict]:
         """Legacy entry point kept for compatibility."""
         term = f"({query}) AND ({affiliation}[Affiliation])"
