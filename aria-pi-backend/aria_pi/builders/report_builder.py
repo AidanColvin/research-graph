@@ -835,6 +835,17 @@ def _facts_table(facts, ticker, exchange, rev, rd, net, assets, emp, edgar_url) 
     return rows
 
 
+def _fmt_unc_org(org: str) -> str:
+    """Normalize raw NIH/SEC org strings to a readable UNC unit name."""
+    s = (org or "").strip()
+    for prefix in ("UNIV OF NORTH CAROLINA", "UNIVERSITY OF NORTH CAROLINA",
+                   "UNC AT CHAPEL HILL", "UNC-CHAPEL HILL"):
+        if s.upper().startswith(prefix):
+            tail = s[len(prefix):].strip(" -,")
+            return ("UNC Chapel Hill" + (f" — {tail.title()}" if tail else ""))
+    return s.title() if s.isupper() else s
+
+
 def _fmt_hq(hq: str) -> str:
     """'RAHWAY, NJ' -> 'Rahway, NJ'. Title-case city, keep state code upper."""
     parts = [p.strip() for p in hq.split(",")]
