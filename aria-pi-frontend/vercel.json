@@ -1,4 +1,9 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "functions": {
+    "src/app/api/run-pipeline/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }

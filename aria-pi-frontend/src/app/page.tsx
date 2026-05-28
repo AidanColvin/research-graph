@@ -32,12 +32,9 @@ export default function Home() {
     }, 1800);
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const controller = new AbortController();
-      // Depth over speed — give the backend up to 5 minutes to assemble a
-      // thorough, accurate report rather than truncating sources.
       const timeout = setTimeout(() => controller.abort(), 300_000);
-      const res = await fetch(`${baseUrl}/run-pipeline`, {
+      const res = await fetch('/api/run-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sector }),
