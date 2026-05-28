@@ -1,4 +1,224 @@
 {
+  "pharmaceutical": {
+    "definition": "The pharmaceutical sector develops, manufactures, and markets prescription and over-the-counter human therapeutics, including small molecules, biologics, vaccines, and combination products regulated by the US Food and Drug Administration.",
+    "definition_sources": [
+      "https://www.fda.gov/drugs",
+      "https://www.fda.gov/about-fda/center-drug-evaluation-and-research-cder"
+    ],
+    "scale": "FDA's Center for Drug Evaluation and Research (CDER) reviews and approves new prescription drug applications; total NIH FY2024 enacted budget supporting US biomedical research was approximately $47.1 billion.",
+    "scale_sources": [
+      "https://www.fda.gov/about-fda/center-drug-evaluation-and-research-cder",
+      "https://www.nih.gov/about-nih/what-we-do/budget"
+    ],
+    "why_now": [
+      {
+        "signal": "FDA approved a record number of novel therapies in recent years, with CDER tracking annual novel drug approvals on its Drug Approvals and Databases page.",
+        "sources": [
+          "https://www.fda.gov/drugs/development-approval-process-drugs/novel-drug-approvals-fda",
+          "https://www.fda.gov/drugs"
+        ]
+      },
+      {
+        "signal": "Inflation Reduction Act Medicare drug-price negotiation provisions are reshaping pricing dynamics for selected high-spend prescription drugs.",
+        "sources": [
+          "https://www.cms.gov/inflation-reduction-act-and-medicare",
+          "https://www.hhs.gov"
+        ]
+      },
+      {
+        "signal": "FDA Cellular and Gene Therapy Products office continues to clear novel CAR-T, AAV, and other advanced therapy programs.",
+        "sources": [
+          "https://www.fda.gov/vaccines-blood-biologics/cellular-gene-therapy-products",
+          "https://www.fda.gov/vaccines-blood-biologics"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina hosts one of the densest US pharmaceutical manufacturing and R&D footprints, anchored by Research Triangle Park and including major facilities operated by Pfizer, GSK, Biogen, Grifols, FUJIFILM Diosynth Biotechnologies, and Eli Lilly's Concord parenteral manufacturing site.",
+    "nc_context_sources": [
+      "https://www.ncbiotech.org",
+      "https://www.rtp.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Eshelman School of Pharmacy",
+        "focus": "Drug discovery, pharmaceutical sciences, clinical pharmacology, and translational drug development.",
+        "url": "https://pharmacy.unc.edu"
+      },
+      {
+        "unit": "UNC School of Medicine — Department of Pharmacology",
+        "focus": "Molecular pharmacology and translational therapeutics.",
+        "url": "https://www.med.unc.edu/pharm"
+      },
+      {
+        "unit": "UNC Lineberger Comprehensive Cancer Center",
+        "focus": "NCI-designated comprehensive cancer center conducting therapeutic discovery and clinical trials.",
+        "url": "https://unclineberger.org"
+      },
+      {
+        "unit": "UNC Institute for Pharmacogenomics and Individualized Therapy",
+        "focus": "Pharmacogenomics-driven precision medicine and drug-response research.",
+        "url": "https://pharmacy.unc.edu/research/centers/iipit"
+      },
+      {
+        "unit": "NC TraCS Institute",
+        "focus": "NIH CTSA-funded clinical and translational research infrastructure supporting industry-sponsored trials.",
+        "url": "https://tracs.unc.edu"
+      }
+    ]
+  },
+  "pharma": "alias:pharmaceutical",
+  "pharmaceuticals": "alias:pharmaceutical",
+  "drugs": "alias:pharmaceutical",
+  "medtech": {
+    "definition": "Medical technology covers medical devices, diagnostics, surgical robotics, imaging systems, and digital health hardware regulated primarily by the FDA Center for Devices and Radiological Health.",
+    "definition_sources": [
+      "https://www.fda.gov/medical-devices",
+      "https://www.fda.gov/about-fda/center-devices-and-radiological-health"
+    ],
+    "scale": "FDA's Center for Devices and Radiological Health regulates more than 190,000 device types; CDRH publishes 510(k) and PMA clearances continuously.",
+    "scale_sources": [
+      "https://www.fda.gov/medical-devices",
+      "https://www.fda.gov/about-fda/center-devices-and-radiological-health"
+    ],
+    "why_now": [
+      {
+        "signal": "FDA's Digital Health Center of Excellence continues to expand pathways for software-as-a-medical-device (SaMD) and AI/ML-enabled devices.",
+        "sources": [
+          "https://www.fda.gov/medical-devices/digital-health-center-excellence",
+          "https://www.fda.gov/medical-devices"
+        ]
+      },
+      {
+        "signal": "CMS Transitional Coverage for Emerging Technologies pathway accelerates Medicare coverage decisions for breakthrough devices.",
+        "sources": [
+          "https://www.cms.gov",
+          "https://www.fda.gov/medical-devices"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's medical technology cluster spans BD (Becton Dickinson) in RTP, Hologic, Cardinal Health, and a growing surgical-robotics presence supported by Duke and UNC clinical infrastructure.",
+    "nc_context_sources": [
+      "https://www.ncbiotech.org",
+      "https://www.rtp.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC/NCSU Joint Department of Biomedical Engineering",
+        "focus": "Medical device development, imaging, and biomedical instrumentation.",
+        "url": "https://www.bme.unc.edu"
+      },
+      {
+        "unit": "UNC School of Medicine",
+        "focus": "Clinical adoption pathways and translational device evaluation.",
+        "url": "https://www.med.unc.edu"
+      },
+      {
+        "unit": "NC TraCS Institute",
+        "focus": "Clinical trial infrastructure for device studies through UNC Health.",
+        "url": "https://tracs.unc.edu"
+      }
+    ]
+  },
+  "ag-bio": {
+    "definition": "Agricultural biotechnology applies molecular biology, plant breeding, microbial science, and genomic tools to crop, livestock, and food-system challenges, regulated jointly by USDA, EPA, and FDA.",
+    "definition_sources": [
+      "https://www.usda.gov/topics/biotechnology",
+      "https://www.aphis.usda.gov/aphis/ourfocus/biotechnology"
+    ],
+    "scale": "USDA NIFA awards hundreds of millions in agricultural research grants annually, and the NSF Plant Genome Research Program supports foundational plant biology research.",
+    "scale_sources": [
+      "https://www.nifa.usda.gov",
+      "https://www.nsf.gov/funding/pgms_summ.jsp?pims_id=5338"
+    ],
+    "why_now": [
+      {
+        "signal": "USDA's Coordinated Framework for the Regulation of Biotechnology continues updates to streamline review of genome-edited crops.",
+        "sources": [
+          "https://www.aphis.usda.gov/aphis/ourfocus/biotechnology",
+          "https://www.usda.gov/topics/biotechnology"
+        ]
+      },
+      {
+        "signal": "AFRI (Agriculture and Food Research Initiative) is a major federal funding stream for sustainable agriculture and bioeconomy programs.",
+        "sources": [
+          "https://www.nifa.usda.gov/grants/programs/agriculture-food-research-initiative-afri",
+          "https://www.nifa.usda.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina is the largest US producer of tobacco and sweet potatoes and a top-five state in poultry, hogs, and Christmas trees; NC State University anchors the state's ag-bio research, and BASF, Bayer, and Syngenta operate RTP-area R&D sites.",
+    "nc_context_sources": [
+      "https://www.ncagr.gov",
+      "https://www.ncbiotech.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Biology",
+        "focus": "Plant biology, evolutionary genomics, and microbial ecology.",
+        "url": "https://bio.unc.edu"
+      },
+      {
+        "unit": "UNC Gillings School of Global Public Health — Nutrition",
+        "focus": "Food systems, nutrition, and population-health intersection with agriculture.",
+        "url": "https://sph.unc.edu/nutr/nutrition"
+      },
+      {
+        "unit": "UNC Institute for the Environment",
+        "focus": "Environmental research with overlap to agricultural sustainability.",
+        "url": "https://ie.unc.edu"
+      }
+    ]
+  },
+  "ai": {
+    "definition": "Artificial intelligence and machine learning encompass software systems that learn from data to perform tasks including classification, generation, prediction, and decision support across healthcare, science, and industry.",
+    "definition_sources": [
+      "https://www.nist.gov/artificial-intelligence",
+      "https://www.nsf.gov/cise/ai.jsp"
+    ],
+    "scale": "The National AI Initiative coordinates federal AI R&D across NSF, DOE, NIH, and other agencies; NSF's AI Research Institutes program has awarded over $500 million to multi-institutional AI centers.",
+    "scale_sources": [
+      "https://www.ai.gov",
+      "https://new.nsf.gov/funding/initiatives/national-ai"
+    ],
+    "why_now": [
+      {
+        "signal": "NIST AI Risk Management Framework and the Executive Order on Safe, Secure, and Trustworthy AI are setting evaluation standards for foundation-model systems.",
+        "sources": [
+          "https://www.nist.gov/itl/ai-risk-management-framework",
+          "https://www.nist.gov/artificial-intelligence"
+        ]
+      },
+      {
+        "signal": "FDA Digital Health Center of Excellence is publishing guidance on AI/ML-enabled medical devices, opening healthcare deployment pathways.",
+        "sources": [
+          "https://www.fda.gov/medical-devices/digital-health-center-excellence",
+          "https://www.fda.gov/medical-devices"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's AI ecosystem spans SAS Institute (one of the world's largest analytics companies, headquartered in Cary), IBM RTP, Red Hat (now part of IBM), Epic Games, and a growing healthcare-AI cluster around UNC Health and Duke Health.",
+    "nc_context_sources": [
+      "https://www.sas.com",
+      "https://www.ncbiotech.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Machine learning, computer graphics, natural language processing, and AI safety research.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC School of Data Science and Society",
+        "focus": "Data science research, training, and translational data analytics.",
+        "url": "https://datasciences.unc.edu"
+      },
+      {
+        "unit": "Carolina Health Informatics Program (CHIP)",
+        "focus": "Health informatics, clinical AI, and biomedical data science training.",
+        "url": "https://chip.unc.edu"
+      }
+    ]
+  },
   "oncology": {
     "definition": "Oncology is the branch of medicine dealing with the prevention, diagnosis, and treatment of cancer, encompassing therapeutic modalities including chemotherapy, radiation oncology, surgical oncology, immunotherapy, and targeted therapies.",
     "definition_sources": [

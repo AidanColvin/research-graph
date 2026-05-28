@@ -13,6 +13,7 @@ Flow per request:
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -113,7 +114,11 @@ async def run_pipeline(req: PipelineRequest):
             "pubmed_enabled": bool(pubmed),
         }
 
-        return {"sector": req.sector, "status": "COMPLETED", "data": report}
+        payload = {"sector": req.sector, "status": "COMPLETED", "data": report}
+        return JSONResponse(
+            content=payload,
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
 
     except Exception as e:
         import traceback
