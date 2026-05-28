@@ -28,7 +28,7 @@ class SECEdgarClient:
 
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=10)
+            r = requests.get(url, headers=HEADERS, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
@@ -72,7 +72,7 @@ class SECEdgarClient:
     def _find_cik(self, company_name: str) -> Optional[str]:
         try:
             r = requests.get(self.search_url, headers=HEADERS,
-                             params={"q": company_name}, timeout=10)
+                             params={"q": company_name}, timeout=6)
             r.raise_for_status()
             hits = r.json().get("hits", {}).get("hits", []) or []
             for hit in hits:

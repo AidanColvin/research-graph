@@ -176,8 +176,85 @@ function Empty({ label }: { label: string }) {
   return <p style={styles.empty}>{label}</p>;
 }
 
+// ── Defensive defaults — any missing field falls back to {} or [] ─────────────
+function normalize(raw: any): ReportData {
+  const d = raw || {};
+  const sec = (k: string) => d[k] || {};
+  const arr = (k: string) => Array.isArray(d[k]) ? d[k] : [];
+  const sourced = (x: any): Sourced => ({
+    text: (x && x.text) || '',
+    sources: (x && Array.isArray(x.sources)) ? x.sources : [],
+  });
+  const s1 = sec('section1_overview');
+  const s2 = sec('section2_internal_mapping');
+  const s3 = sec('section3_selection');
+  const s5 = sec('section5_value_prop');
+  const s6 = sec('section6_talking_points');
+  return {
+    report_meta: {
+      sector: d.report_meta?.sector || d.sector || '—',
+      date: d.report_meta?.date || '',
+      prepared_by: d.report_meta?.prepared_by || 'Research Intelligence Team — UNC Chapel Hill',
+      version: d.report_meta?.version || 'Draft',
+    },
+    section1_overview: {
+      definition: sourced(s1.definition),
+      scale: sourced(s1.scale),
+      why_now: Array.isArray(s1.why_now) ? s1.why_now : [],
+      nc_context: sourced(s1.nc_context),
+      unc_units: Array.isArray(s1.unc_units) ? s1.unc_units : [],
+    },
+    section2_internal_mapping: {
+      known_partnerships: Array.isArray(s2.known_partnerships) ? s2.known_partnerships : [],
+      unc_faculty: Array.isArray(s2.unc_faculty) ? s2.unc_faculty : [],
+      data_assets: Array.isArray(s2.data_assets) ? s2.data_assets : [],
+      risk_flags: Array.isArray(s2.risk_flags) ? s2.risk_flags : [],
+    },
+    section3_selection: {
+      selected: Array.isArray(s3.selected) ? s3.selected : [],
+      excluded: Array.isArray(s3.excluded) ? s3.excluded : [],
+    },
+    section4_profiles: Array.isArray(d.section4_profiles) ? d.section4_profiles.map((p: any) => ({
+      company_name: p?.company_name || '—',
+      overview: sourced(p?.overview),
+      partnership_type: p?.partnership_type || 'Unknown',
+      existing_unc_tie: !!p?.existing_unc_tie,
+      facts: p?.facts || {},
+      pipeline: Array.isArray(p?.pipeline) ? p.pipeline : [],
+      partnering_history: Array.isArray(p?.partnering_history) ? p.partnering_history : [],
+      unc_alignment: Array.isArray(p?.unc_alignment) ? p.unc_alignment : [],
+      what_unc_offers: Array.isArray(p?.what_unc_offers) ? p.what_unc_offers : [],
+      signals: Array.isArray(p?.signals) ? p.signals : [],
+    })) : [],
+    section5_value_prop: {
+      data_assets: Array.isArray(s5.data_assets) ? s5.data_assets : [],
+      research_capacity: Array.isArray(s5.research_capacity) ? s5.research_capacity : [],
+      talent_pipeline: Array.isArray(s5.talent_pipeline) ? s5.talent_pipeline : [],
+      nc_access: Array.isArray(s5.nc_access) ? s5.nc_access : [],
+      future_signals: Array.isArray(s5.future_signals) ? s5.future_signals : [],
+      partnership_models: Array.isArray(s5.partnership_models) ? s5.partnership_models : [],
+    },
+    section6_talking_points: {
+      sector_opening: sourced(s6.sector_opening),
+      companies: Array.isArray(s6.companies) ? s6.companies.map((c: any) => ({
+        company: c?.company || '—',
+        know_company: sourced(c?.know_company),
+        know_pipeline: sourced(c?.know_pipeline),
+        know_moves: sourced(c?.know_moves),
+        unc_hook: sourced(c?.unc_hook),
+      })) : [],
+    },
+    section7_verification: Array.isArray(d.section7_verification) ? d.section7_verification : [],
+    references: Array.isArray(d.references) ? d.references : [],
+    _validation: d._validation,
+    _meta: d._meta,
+    _stub: d._stub,
+  };
+}
+
 // ── Main Report ───────────────────────────────────────────────────────────────
-export default function Report({ data }: { data: ReportData }) {
+export default function Report({ data: rawData }: { data: any }) {
+  const data = normalize(rawData);
   const m = data.report_meta;
   const v = data._validation;
 

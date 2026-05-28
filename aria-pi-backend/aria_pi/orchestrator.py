@@ -96,24 +96,31 @@ async def run_pipeline(req: PipelineRequest):
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds = _seeds_for(req.sector, override)
 
-        # 1. Real data collection per company
+        # 1. Real data collection per company (cap at 3 to fit Vercel 60s budget)
         company_data = []
-        for name in seeds[:5]:
-            facts = sec.get_company_facts(name)
-            company_trials = trials.search_by_sponsor(name)
+        for name in seeds[:3]:
+            try:
+                facts = sec.get_company_facts(name)
+            except Exception as e:
+                print(f"SEC lookup failed for {name}: {e}")
+                facts = {"legal_name": name, "source": "https://www.sec.gov"}
+            try:
+                company_trials = trials.search_by_sponsor(name)
+            except Exception as e:
+                print(f"Trials lookup failed for {name}: {e}")
+                company_trials = []
             papers: list = []
             if pubmed:
                 try:
                     papers = pubmed.search_by_affiliation(
-                        query=f"{name}", affiliation="UNC Chapel Hill", max_results=5
+                        query=name, affiliation="UNC Chapel Hill", max_results=3
                     )
                 except Exception as e:
                     print(f"PubMed lookup failed for {name}: {e}")
-                    papers = []
             company_data.append({
                 "name": name,
                 "facts": facts,
-                "trials": company_trials[:8],
+                "trials": company_trials[:6],
                 "pubmed": papers,
             })
 

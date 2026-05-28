@@ -3,13 +3,11 @@
   "builds": [
     {
       "src": "aria_pi/orchestrator.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "15mb", "maxDuration": 60 }
     }
   ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "aria_pi/orchestrator.py"
-    }
+    { "src": "/(.*)", "dest": "aria_pi/orchestrator.py" }
   ]
 }
