@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import uvicorn
 
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
@@ -93,49 +94,13 @@ async def run_pipeline(req: PipelineRequest):
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds = _seeds_for(req.sector, override)
 
-        # 1. Real data collection per company (cap at 3 to fit Vercel 60s budget)
-        company_data = []
-        for name in seeds[:3]:
-            try:
-                facts = sec.get_company_facts(name)
-            except Exception as e:
-                print(f"SEC lookup failed for {name}: {e}")
-                facts = {"legal_name": name, "source": "https://www.sec.gov"}
-            try:
-                company_trials = trials.search_by_sponsor(name)
-            except Exception as e:
-                print(f"Trials lookup failed for {name}: {e}")
-                company_trials = []
-            papers: list = []
-            try:
-                papers = pubmed.search_unc_with_company(name, max_results=4)
-            except Exception as e:
-                print(f"PubMed lookup failed for {name}: {e}")
-
-            coi_papers: list = []
-            try:
-                coi_papers = pubmed.search_coi_disclosures(name, max_results=3)
-            except Exception as e:
-                print(f"PubMed COI lookup failed for {name}: {e}")
-
-            grants: list = []
-            try:
-                grants = nih.unc_grants_mentioning(name, max_results=4)
-            except Exception as e:
-                print(f"NIH Reporter lookup failed for {name}: {e}")
-
-            # ClinicalTrials.gov collaborators where UNC appears = direct partnership.
-            unc_trials = [t for t in company_trials if t.get("unc_signal")]
-
-            company_data.append({
-                "name": name,
-                "facts": facts,
-                "trials": company_trials[:6],
-                "unc_trials": unc_trials,
-                "pubmed": papers,
-                "pubmed_coi": coi_papers,
-                "nih_grants": grants,
-            })
+        # 1. Real data collection per company — runs ALL 5 sources in parallel
+        # for ALL 5 candidate companies (5 × 5 = 25 concurrent HTTP calls), so
+        # the full source treatment lands every profile within the Vercel
+        # 60s function budget.
+        company_data = _fetch_all_concurrent(
+            seeds[:5], sec=sec, trials=trials, pubmed=pubmed, nih=nih
+        )
 
         # 2. Deterministic synthesis
         report = builder.build(req.sector, {"sector": req.sector, "companies": company_data})
@@ -154,6 +119,73 @@ async def run_pipeline(req: PipelineRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
+    """Run all 5 data-source lookups for one company in parallel."""
+    def safe(fn, label, default):
+        try:
+            return fn()
+        except Exception as e:
+            print(f"{label} failed for {name}: {e}")
+            return default
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {
+            "facts": pool.submit(safe,
+                lambda: sec.get_company_facts(name),
+                "SEC", {"legal_name": name, "source": "https://www.sec.gov"}),
+            "trials": pool.submit(safe,
+                lambda: trials.search_by_sponsor(name), "Trials", []),
+            "pubmed": pool.submit(safe,
+                lambda: pubmed.search_unc_with_company(name, max_results=4),
+                "PubMed", []),
+            "pubmed_coi": pool.submit(safe,
+                lambda: pubmed.search_coi_disclosures(name, max_results=3),
+                "PubMed COI", []),
+            "nih_grants": pool.submit(safe,
+                lambda: nih.unc_grants_mentioning(name, max_results=4),
+                "NIH Reporter", []),
+        }
+        results = {k: f.result() for k, f in futures.items()}
+
+    company_trials = results["trials"] or []
+    unc_trials = [t for t in company_trials if t.get("unc_signal")]
+    return {
+        "name": name,
+        "facts": results["facts"],
+        "trials": company_trials[:6],
+        "unc_trials": unc_trials,
+        "pubmed": results["pubmed"],
+        "pubmed_coi": results["pubmed_coi"],
+        "nih_grants": results["nih_grants"],
+    }
+
+
+def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
+    """Fetch data for every named company concurrently.
+
+    Total wall time ≈ slowest single API call × 1, not × N. This is what
+    lets every public-page profile carry the full 5-source treatment.
+    """
+    if not names:
+        return []
+    out_by_name: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=len(names)) as pool:
+        future_to_name = {
+            pool.submit(_fetch_one_company, n, **clients): n for n in names
+        }
+        for fut in as_completed(future_to_name):
+            name = future_to_name[fut]
+            try:
+                out_by_name[name] = fut.result()
+            except Exception as e:
+                print(f"Company fetch error for {name}: {e}")
+                out_by_name[name] = {"name": name, "facts": {}, "trials": [],
+                                     "unc_trials": [], "pubmed": [],
+                                     "pubmed_coi": [], "nih_grants": []}
+    # Preserve seed order
+    return [out_by_name[n] for n in names if n in out_by_name]
 
 
 def _validate_report_sources(report: dict, tagger: SourceTagger) -> dict:

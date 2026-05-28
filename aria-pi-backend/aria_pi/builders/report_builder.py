@@ -44,7 +44,7 @@ class ReportBuilder:
         s1 = self._section1(ctx)
         s2 = self._section2(sector, companies)
         s3 = self._section3(companies)
-        s4 = [self._profile(c, ctx) for c in companies[:3]]
+        s4 = [self._profile(c, ctx) for c in companies[:5]]
         s5 = self._section5(sector)
         s6 = self._section6(companies)
         report = {
