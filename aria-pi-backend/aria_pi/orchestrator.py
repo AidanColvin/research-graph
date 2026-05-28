@@ -26,7 +26,12 @@ from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.nih_reporter_client import NIHReporterClient
 from aria_pi.builders.report_builder import ReportBuilder
 from aria_pi.utils.source_tagger import SourceTagger
-from aria_pi.sectors import seeds_for as _seeds_for
+from aria_pi.sectors import (
+    seeds_for as _seeds_for,
+    canonical_sector,
+    SECTOR_SEEDS,
+    DEFAULT_SEEDS,
+)
 
 
 app = FastAPI(title="ARIA-PI Orchestrator", version="0.3.0")
@@ -74,7 +79,7 @@ async def run_pipeline(req: PipelineRequest):
         nih = NIHReporterClient()
 
         override = req.companies or ([req.company_override] if req.company_override else None)
-        seeds = _seeds_for(req.sector, override)
+        seeds, resolution = _resolve_seeds(req.sector, override, sec)
 
         # 1. Real data collection per company — runs all sources in parallel
         # for up to 10 candidate companies within the Vercel 60s budget.
@@ -90,6 +95,7 @@ async def run_pipeline(req: PipelineRequest):
         report["_meta"] = {
             "mode": "free",
             "seed_companies": seeds[:10],
+            "resolution": resolution,  # "curated" | "discovered" | "override" | "default"
             "pubmed_enabled": bool(pubmed),
         }
 
@@ -111,6 +117,34 @@ async def run_pipeline(req: PipelineRequest):
 # the ReportBuilder derives a complete, sector-specific report from partial
 # data (SEC EDGAR is the fast, reliable backbone; PubMed/NIH/Trials enrich it).
 FETCH_BUDGET_SECONDS = 40
+
+
+def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
+    """Decide which companies a report covers, in priority order:
+
+      1. override    — caller passed explicit companies.
+      2. curated      — the sector maps to one of our 24 canonical sectors,
+                        which have hand-picked top-10 lists (highest quality).
+      3. discovered   — ANY other free-text term ("pasta", "video games"):
+                        pull real, currently-traded companies live from SEC
+                        EDGAR full-text search. This is what makes the tool
+                        work for arbitrary searches instead of defaulting.
+      4. default      — only if SEC discovery returns nothing (network/odd
+                        term): a small generic anchor list, clearly flagged.
+    """
+    if override:
+        return list(override), "override"
+    canon = canonical_sector(sector)
+    if canon and canon in SECTOR_SEEDS:
+        return SECTOR_SEEDS[canon], "curated"
+    try:
+        discovered = sec.discover_companies(sector, limit=10)
+    except Exception as e:
+        print(f"discovery failed for '{sector}': {e}")
+        discovered = []
+    if discovered:
+        return discovered, "discovered"
+    return DEFAULT_SEEDS, "default"
 
 
 def _empty_company(name: str) -> dict:

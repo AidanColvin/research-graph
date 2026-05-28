@@ -5,12 +5,32 @@ Uses two SEC endpoints:
   2. data.sec.gov/submissions/CIK{cik}.json  — rich company submissions
 """
 import requests
-from typing import Optional
+from datetime import date
+from typing import Optional, List
 
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 
 _TICKERS_CACHE: list | None = None
+_CIK_TITLE_CACHE: dict | None = None
+
+
+def _active_cik_titles() -> dict:
+    """Map {int(cik): official_title} for every currently-traded SEC filer.
+
+    Used to filter full-text search hits down to live, public companies so
+    discovery never surfaces defunct shells (e.g. THQ, Midway)."""
+    global _CIK_TITLE_CACHE
+    if _CIK_TITLE_CACHE is not None:
+        return _CIK_TITLE_CACHE
+    out: dict = {}
+    for t in _load_tickers():
+        try:
+            out[int(t["cik_str"])] = t.get("title") or ""
+        except (KeyError, ValueError, TypeError):
+            continue
+    _CIK_TITLE_CACHE = out
+    return out
 
 
 def _load_tickers() -> list:
@@ -38,6 +58,58 @@ class SECEdgarClient:
         self.search_url = "https://efts.sec.gov/LATEST/search-index"
         self.submissions_url = "https://data.sec.gov/submissions/CIK{cik}.json"
         self.companyfacts_url = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+
+    def discover_companies(self, term: str, limit: int = 10) -> List[str]:
+        """Find real, currently-traded public companies for ANY free-text term.
+
+        Strategy: SEC EDGAR full-text search over recent 10-K annual reports
+        (the filing where a company describes its own business), then keep only
+        hits that resolve to a CIK present in SEC's official ticker map — i.e.
+        companies that are actually public and active today. This is what lets
+        the pipeline build a genuine, sector-relevant report for searches like
+        "pasta" or "video games" instead of falling back to a default list.
+
+        Every returned name resolves cleanly back to a CIK via _find_cik, so the
+        downstream SEC/NIH/trial/PubMed lookups all key off real EDGAR data.
+        """
+        term = (term or "").strip()
+        if not term:
+            return []
+        active = _active_cik_titles()
+        if not active:
+            return []
+        # Bias toward live filers: last ~4 fiscal years of 10-K business
+        # descriptions. Phrase-quote multi-word terms for precision.
+        q = f'"{term}"' if " " in term else term
+        start = date(date.today().year - 4, 1, 1).isoformat()
+        end = date.today().isoformat()
+        try:
+            r = requests.get(
+                self.search_url, headers=HEADERS, timeout=8,
+                params={"q": q, "forms": "10-K",
+                        "startdt": start, "enddt": end},
+            )
+            r.raise_for_status()
+            hits = r.json().get("hits", {}).get("hits", []) or []
+        except Exception as e:
+            print(f"SEC discovery error for '{term}': {e}")
+            return []
+
+        out: List[str] = []
+        seen: set = set()
+        for h in hits:
+            for c in (h.get("_source", {}) or {}).get("ciks", []) or []:
+                try:
+                    ci = int(c)
+                except (ValueError, TypeError):
+                    continue
+                title = active.get(ci)
+                if title and ci not in seen:
+                    seen.add(ci)
+                    out.append(title)
+                if len(out) >= limit:
+                    return out
+        return out
 
     def get_company_facts(self, company_name: str) -> dict:
         """Search EDGAR for a company and return enriched facts.
