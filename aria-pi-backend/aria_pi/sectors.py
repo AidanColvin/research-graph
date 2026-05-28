@@ -20,6 +20,12 @@ SECTOR_SEEDS = {
                 "Becton Dickinson", "Zimmer Biomet", "Intuitive Surgical", "ResMed", "Hologic"],
     "rural health": ["Teladoc Health", "Doximity", "HCA Healthcare", "American Well", "Hims & Hers Health",
                      "LifePoint Health", "Community Health Systems", "Encompass Health", "Acadia Healthcare", "Tenet Healthcare"],
+    # Broad "healthcare" umbrella — deliberately diversified across payers,
+    # pharma, medical devices, pharmacy/health services, and hospital systems
+    # so a generic "healthcare" search returns the marquee players across the
+    # whole sector, not just pharma.
+    "healthcare": ["UnitedHealth Group", "Johnson & Johnson", "Pfizer", "Eli Lilly", "Merck",
+                   "Abbott Laboratories", "CVS Health", "Cigna", "Elevance Health", "HCA Healthcare"],
     # Electronic health records / health IT. Epic Systems and Meditech are private
     # (no SEC filings), so this curated set covers the public, sourceable EHR and
     # health-IT vendors. A search for "Epic" or "EHR" routes here.
@@ -78,7 +84,7 @@ SECTOR_SEEDS = {
 SECTOR_DOMAIN = {
     "oncology": "health", "biotech": "health", "pharmaceutical": "health",
     "ag-bio": "health", "medtech": "health", "rural health": "health",
-    "health it": "health",
+    "health it": "health", "healthcare": "health",
     "technology": "tech", "software": "tech", "artificial intelligence": "tech",
     "semiconductors": "tech", "cybersecurity": "tech", "cloud computing": "tech",
     "quantum computing": "tech", "robotics": "tech", "telecom": "tech",
@@ -99,6 +105,8 @@ _KEYWORD_ROUTES = [
       "epic", "cerner", "meditech", "health it", "health information",
       "clinical software"), "health it"),
     (("rural", "telehealth", "telemedicine"), "rural health"),
+    (("hospital", "managed care", "health system", "healthcare", "health care",
+      "payer", "health plan"), "healthcare"),
     (("agric", "ag-bio", "agbio", "crop", "farm"), "ag-bio"),
     (("semiconductor", "chip", "microchip", "foundry"), "semiconductors"),
     (("cyber", "infosec", "security software"), "cybersecurity"),
@@ -114,7 +122,8 @@ _KEYWORD_ROUTES = [
     (("automot", "electric vehicle", "mobility", "vehicle"), "automotive"),
     (("aerospace", "defense", "defence", "aviation", "space"), "aerospace"),
     (("insurance", "insurer", "reinsur", "underwrit", "actuar"), "insurance"),
-    (("bank", "asset manage", "capital market", "invest"), "finance"),
+    (("bank", "asset manage", "capital market", "invest", "credit card",
+      "wealth manage", "financial service"), "finance"),
     (("retail", "ecommerce", "e-commerce", "store"), "retail"),
     (("consumer", "cpg", "apparel", "food", "beverage"), "consumer"),
     (("industrial", "manufactur", "machinery", "logistics"), "industrial"),
@@ -155,6 +164,13 @@ _EXACT_ALIASES = {
     "big tech": "technology",
     "biotechnology": "biotech",
     "pharma": "pharmaceutical",
+    "health care": "healthcare",
+    "healthcare": "healthcare",
+    "health": "healthcare",
+    "financial services": "finance",
+    "financial service": "finance",
+    "financial": "finance",
+    "banking": "finance",
 }
 
 

@@ -15,11 +15,12 @@ const STAGES = [
 
 // Canonical sectors the backend understands — used for inline autocomplete.
 const SECTORS = [
-  'Oncology', 'Biotech', 'Pharmaceutical', 'Ag-Bio', 'Medtech', 'Rural Health',
-  'Technology', 'Software', 'Artificial Intelligence', 'Semiconductors',
-  'Cybersecurity', 'Cloud Computing', 'Fintech', 'Quantum Computing', 'Robotics',
-  'Telecom', 'Climate Tech', 'Energy', 'Automotive', 'Aerospace', 'Consumer',
-  'Retail', 'Finance', 'Insurance', 'Industrial',
+  'Healthcare', 'Oncology', 'Biotech', 'Pharmaceutical', 'Ag-Bio', 'Medtech',
+  'Rural Health', 'Health IT', 'Technology', 'Software', 'Artificial Intelligence',
+  'Semiconductors', 'Cybersecurity', 'Cloud Computing', 'Fintech',
+  'Quantum Computing', 'Robotics', 'Telecom', 'Climate Tech', 'Energy',
+  'Automotive', 'Aerospace', 'Consumer', 'Retail', 'Financial Services',
+  'Finance', 'Insurance', 'Industrial',
 ];
 
 // First sector whose name starts with what's typed (case-insensitive).
