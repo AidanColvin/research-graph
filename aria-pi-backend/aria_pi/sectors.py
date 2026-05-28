@@ -20,13 +20,23 @@ SECTOR_SEEDS = {
                 "Becton Dickinson", "Zimmer Biomet", "Intuitive Surgical", "ResMed", "Hologic"],
     "rural health": ["Teladoc Health", "Doximity", "HCA Healthcare", "American Well", "Hims & Hers Health",
                      "LifePoint Health", "Community Health Systems", "Encompass Health", "Acadia Healthcare", "Tenet Healthcare"],
+    # Electronic health records / health IT. Epic Systems and Meditech are private
+    # (no SEC filings), so this curated set covers the public, sourceable EHR and
+    # health-IT vendors. A search for "Epic" or "EHR" routes here.
+    "health it": ["Oracle", "Veeva Systems", "Doximity", "Health Catalyst", "Evolent Health",
+                  "Phreesia", "Definitive Healthcare", "Computer Programs and Systems", "Teladoc Health", "Premier"],
     # ── Technology ────────────────────────────────────────────────────────
     "technology": ["Apple", "Microsoft", "NVIDIA", "Alphabet", "Meta Platforms",
                    "Amazon", "Samsung", "Intel", "IBM", "Oracle"],
     "software": ["Microsoft", "Salesforce", "Adobe", "ServiceNow", "Snowflake",
                  "Workday", "Intuit", "Autodesk", "Palantir Technologies", "Veeva Systems"],
-    "artificial intelligence": ["NVIDIA", "Microsoft", "Alphabet", "Palantir Technologies", "C3.ai",
-                                 "OpenAI", "Anthropic", "Scale AI", "UiPath", "DataRobot"],
+    # Public, SEC-filing AI leaders only — private labs (OpenAI, Anthropic, xAI)
+    # don't file with the SEC, so they can't be sourced from free public filings
+    # and would render as empty/inaccurate profiles. We cover the public AI value
+    # chain instead: chips, hyperscalers, model platforms, and AI software.
+    "artificial intelligence": ["NVIDIA", "Microsoft", "Alphabet", "Amazon", "Meta Platforms",
+                                 "Palantir Technologies", "Advanced Micro Devices", "Broadcom",
+                                 "Oracle", "C3.ai"],
     "semiconductors": ["NVIDIA", "Advanced Micro Devices", "Intel", "Broadcom", "Qualcomm",
                        "Texas Instruments", "Micron Technology", "Applied Materials", "Lam Research", "TSMC"],
     "cybersecurity": ["CrowdStrike", "Palo Alto Networks", "Fortinet", "Zscaler", "Okta",
@@ -68,6 +78,7 @@ SECTOR_SEEDS = {
 SECTOR_DOMAIN = {
     "oncology": "health", "biotech": "health", "pharmaceutical": "health",
     "ag-bio": "health", "medtech": "health", "rural health": "health",
+    "health it": "health",
     "technology": "tech", "software": "tech", "artificial intelligence": "tech",
     "semiconductors": "tech", "cybersecurity": "tech", "cloud computing": "tech",
     "quantum computing": "tech", "robotics": "tech", "telecom": "tech",
@@ -84,6 +95,9 @@ _KEYWORD_ROUTES = [
     (("pharma", "drug", "therapeut", "medicine"), "pharmaceutical"),
     (("biotech", "biolog", "genom", "gene therap", "mrna"), "biotech"),
     (("medtech", "medical device", "diagnostic", "imaging"), "medtech"),
+    (("ehr", "electronic health record", "electronic medical record", "emr ",
+      "epic", "cerner", "meditech", "health it", "health information",
+      "clinical software"), "health it"),
     (("rural", "telehealth", "telemedicine"), "rural health"),
     (("agric", "ag-bio", "agbio", "crop", "farm"), "ag-bio"),
     (("semiconductor", "chip", "microchip", "foundry"), "semiconductors"),
@@ -127,24 +141,51 @@ def _collapse(s: str) -> str:
     return "".join(ch for ch in s.lower() if ch.isalpha() and ch not in "aeiou0123456789")
 
 
+# Short / ambiguous abbreviations that must match the WHOLE input exactly —
+# never as a substring (e.g. "ai" must not match "retail", "it" must not match
+# "fintech"). Checked by equality only.
+_EXACT_ALIASES = {
+    "ai": "artificial intelligence",
+    "ml": "artificial intelligence",
+    "genai": "artificial intelligence",
+    "llm": "artificial intelligence",
+    "ehr": "health it",
+    "emr": "health it",
+    "health it": "health it",
+    "big tech": "technology",
+    "biotechnology": "biotech",
+    "pharma": "pharmaceutical",
+}
+
+
 def canonical_sector(sector: str) -> Optional[str]:
-    """Resolve a raw sector string to a canonical SECTOR_SEEDS key, or None."""
+    """Resolve a raw sector string to a canonical SECTOR_SEEDS key, or None.
+
+    Order matters: exact key, then whole-string abbreviations, then keyword
+    routes, then (length-guarded) loose containment, then fuzzy skeleton match.
+    The length guard prevents tiny tokens like "ai" from matching by accident
+    inside longer sector names ("retAIl").
+    """
     key = (sector or "").lower().strip()
     if not key:
         return None
     if key in SECTOR_SEEDS:
         return key
-    for known in SECTOR_SEEDS:
-        if known in key or key in known:
-            return known
+    if key in _EXACT_ALIASES:
+        return _EXACT_ALIASES[key]
     for needles, target in _KEYWORD_ROUTES:
         if any(n.strip() in key for n in needles):
             return target
+    if len(key) >= 4:
+        for known in SECTOR_SEEDS:
+            if known in key or key in known:
+                return known
     # Fuzzy: tolerate misspellings by comparing consonant skeletons.
     skel = _collapse(key)
-    for token, target in _FUZZY_ROUTES:
-        if skel and _collapse(token) in skel:
-            return target
+    if len(skel) >= 3:
+        for token, target in _FUZZY_ROUTES:
+            if _collapse(token) in skel:
+                return target
     return None
 
 

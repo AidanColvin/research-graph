@@ -4,6 +4,7 @@ Uses two SEC endpoints:
   1. efts.sec.gov/LATEST/search-index  — full-text filing search
   2. data.sec.gov/submissions/CIK{cik}.json  — rich company submissions
 """
+import time
 import requests
 from datetime import date
 from typing import Optional, List
@@ -83,33 +84,56 @@ class SECEdgarClient:
         q = f'"{term}"' if " " in term else term
         start = date(date.today().year - 4, 1, 1).isoformat()
         end = date.today().isoformat()
-        try:
-            r = requests.get(
-                self.search_url, headers=HEADERS, timeout=8,
-                params={"q": q, "forms": "10-K",
-                        "startdt": start, "enddt": end},
-            )
-            r.raise_for_status()
-            hits = r.json().get("hits", {}).get("hits", []) or []
-        except Exception as e:
-            print(f"SEC discovery error for '{term}': {e}")
-            return []
 
-        out: List[str] = []
-        seen: set = set()
-        for h in hits:
-            for c in (h.get("_source", {}) or {}).get("ciks", []) or []:
-                try:
-                    ci = int(c)
-                except (ValueError, TypeError):
-                    continue
-                title = active.get(ci)
-                if title and ci not in seen:
-                    seen.add(ci)
-                    out.append(title)
-                if len(out) >= limit:
-                    return out
-        return out
+        # Pull a few pages so we can RANK companies by how often the term
+        # appears in their filings. A company whose 10-Ks repeatedly match the
+        # term is far more on-topic than one with a single incidental mention
+        # (which is how noise like "Vail Resorts" for "pasta" used to slip in).
+        #
+        # The first page is fetched exactly like a plain single query (no
+        # `from`) because that form is the most reliable; SEC's efts endpoint
+        # intermittently 500s on paginated/rapid requests, so extra pages are
+        # strictly best-effort and a later failure never discards earlier hits.
+        freq: dict[int, int] = {}
+        order: list[int] = []
+
+        def ingest(hits: list) -> None:
+            for h in hits:
+                for c in (h.get("_source", {}) or {}).get("ciks", []) or []:
+                    try:
+                        ci = int(c)
+                    except (ValueError, TypeError):
+                        continue
+                    if ci not in active:
+                        continue
+                    if ci not in freq:
+                        order.append(ci)
+                    freq[ci] = freq.get(ci, 0) + 1
+
+        base = {"q": q, "forms": "10-K", "startdt": start, "enddt": end}
+        for page in range(3):  # ~30 hits total, best-effort
+            params = dict(base)
+            if page > 0:
+                params["from"] = page * 10
+                time.sleep(0.35)  # be gentle: efts throttles rapid requests
+            try:
+                r = requests.get(self.search_url, headers=HEADERS,
+                                 timeout=8, params=params)
+                r.raise_for_status()
+                hits = r.json().get("hits", {}).get("hits", []) or []
+            except Exception as e:
+                print(f"SEC discovery error for '{term}' (page {page}): {e}")
+                if page == 0:
+                    return []  # genuine failure — nothing to rank
+                break          # keep whatever earlier pages returned
+            if not hits:
+                break
+            ingest(hits)
+
+        # Rank by match frequency (desc), then first-appearance (SEC relevance).
+        first_seen = {ci: i for i, ci in enumerate(order)}
+        ranked = sorted(order, key=lambda ci: (-freq[ci], first_seen[ci]))
+        return [active[ci] for ci in ranked[:limit]]
 
     def get_company_facts(self, company_name: str) -> dict:
         """Search EDGAR for a company and return enriched facts.
@@ -119,7 +143,11 @@ class SECEdgarClient:
         """
         cik = self._find_cik(company_name)
         if not cik:
-            return {"legal_name": company_name, "source": "https://www.sec.gov"}
+            # No CIK => not a current SEC filer (e.g. a private company like
+            # OpenAI, Anthropic, or Epic Systems). Say so honestly instead of
+            # later printing a false "SEC-registered" claim downstream.
+            return {"legal_name": company_name, "is_public": False,
+                    "source": "https://www.sec.gov"}
 
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
@@ -161,6 +189,7 @@ class SECEdgarClient:
         return {
             "legal_name": data.get("name", company_name),
             "cik": cik,
+            "is_public": True,
             "sic": str(data.get("sicDescription") or data.get("sic") or ""),
             "tickers": data.get("tickers", []) or [],
             "exchanges": data.get("exchanges", []) or [],
@@ -259,24 +288,42 @@ class SECEdgarClient:
                 score = 80
             elif q in title.split():
                 score = 60
-            elif q in title:
-                score = 40
+            elif len(q) >= 5 and q in title:
+                score = 50
             if score > best_score:
                 best_score = score
                 best = t
-        if best and best_score >= 40:
+        # Require a reasonably strong match. A bare substring (old score 40)
+        # let private names like "OpenAI" mis-resolve to unrelated public filers
+        # that merely contain the token, producing wrong, "doesn't-make-sense"
+        # company data. We now demand a whole-word or exact match (>= 50).
+        if best and best_score >= 50:
             return str(best["cik_str"])
 
-        # Fallback to full-text search
+        # Fallback to full-text search, but only trust a hit whose resolved
+        # company title actually shares a word with the query — otherwise the
+        # top hit is just some filer that *mentions* the name (e.g. a 10-K
+        # naming "OpenAI"), which would attribute the wrong company's data.
         try:
+            active = _active_cik_titles()
+            q_tokens = {w for w in q.split() if len(w) >= 4}
             r = requests.get(self.search_url, headers=HEADERS,
                              params={"q": company_name}, timeout=6)
             r.raise_for_status()
             hits = r.json().get("hits", {}).get("hits", []) or []
             for hit in hits:
                 ciks = (hit.get("_source", {}) or {}).get("ciks", []) or []
-                if ciks:
-                    return str(ciks[0]).lstrip("0") or ciks[0]
+                for c in ciks:
+                    try:
+                        ci = int(c)
+                    except (ValueError, TypeError):
+                        continue
+                    title = (active.get(ci) or "").lower()
+                    if not title:
+                        continue
+                    title_tokens = set(title.split())
+                    if q == title or (q_tokens and q_tokens & title_tokens):
+                        return str(ci)
             return None
         except Exception as e:
             print(f"SEC search error: {e}")

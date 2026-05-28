@@ -6,7 +6,7 @@ type Sourced = { text: string; sources: string[] };
 type SourceList = string[];
 
 export type ReportData = {
-  report_meta: { sector: string; date: string; prepared_by: string; version: string };
+  report_meta: { sector: string; date: string; generated_at?: string; prepared_by: string; version: string };
   section1_overview: {
     definition: Sourced;
     scale: Sourced;
@@ -58,7 +58,7 @@ export type ReportData = {
   section7_verification: { label: string; checked: boolean }[];
   references: { id: number; title: string; year: string; publisher: string; url: string }[];
   _validation?: { total_claims: number; verified: number; unverified: number; issues: any[] };
-  _meta?: { claude_live: boolean; model: string; seed_companies: string[] };
+  _meta?: { claude_live?: boolean; model?: string; seed_companies?: string[]; resolution?: string; generated_at?: string };
   _stub?: boolean;
 };
 
@@ -71,6 +71,31 @@ type CitationIndex = {
 const TODAY = new Date().toLocaleDateString('en-US', {
   year: 'numeric', month: 'long', day: 'numeric',
 });
+
+// Human-readable "Generated" stamp, e.g. "May 28, 2026, 3:14 PM".
+function formatGenerated(iso: string): string {
+  try {
+    const dt = new Date(iso);
+    if (isNaN(dt.getTime())) return iso;
+    return dt.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+// Friendly label for how the report's companies were selected.
+function resolutionLabel(r: string): string {
+  switch (r) {
+    case 'curated': return 'Curated sector set';
+    case 'discovered': return 'Discovered live from SEC EDGAR';
+    case 'override': return 'Custom company list';
+    case 'default': return 'Generic anchor set';
+    default: return r;
+  }
+}
 
 // Format a single URL as an AMA citation (best-effort from URL structure).
 function amaFormat(url: string): string {
@@ -296,6 +321,7 @@ function normalize(raw: any): ReportData {
     report_meta: {
       sector: d.report_meta?.sector || d.sector || '—',
       date: d.report_meta?.date || '',
+      generated_at: d.report_meta?.generated_at || d._meta?.generated_at || '',
       prepared_by: d.report_meta?.prepared_by || 'Research Intelligence Team — UNC Chapel Hill',
       version: d.report_meta?.version || 'Draft',
     },
@@ -372,6 +398,16 @@ export default function Report({ data: rawData }: { data: any }) {
         <div style={styles.metaRow}>
           <span><strong>Prepared by:</strong> {m.prepared_by}</span>
           <span><strong>Date:</strong> {m.date}</span>
+          {m.generated_at && (
+            <span title={m.generated_at}>
+              <strong>Generated:</strong> {formatGenerated(m.generated_at)}
+            </span>
+          )}
+          {data._meta?.resolution && (
+            <span style={styles.resolutionPill} title="How the companies in this report were chosen">
+              {resolutionLabel(data._meta.resolution)}
+            </span>
+          )}
           <span style={styles.versionPill}>{m.version}</span>
         </div>
 
@@ -774,6 +810,15 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 11,
     fontWeight: 700,
     letterSpacing: '0.06em',
+  },
+  resolutionPill: {
+    padding: '2px 8px',
+    background: '#e0e7ff',
+    color: '#3730a3',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.04em',
   },
   verifyBanner: {
     marginTop: 16,

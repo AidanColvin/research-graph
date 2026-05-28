@@ -97,6 +97,7 @@ async def run_pipeline(req: PipelineRequest):
             "seed_companies": seeds[:10],
             "resolution": resolution,  # "curated" | "discovered" | "override" | "default"
             "pubmed_enabled": bool(pubmed),
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
 
         payload = {"sector": req.sector, "status": "COMPLETED", "data": report}

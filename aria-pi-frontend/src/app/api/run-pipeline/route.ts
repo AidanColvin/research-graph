@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Never cache this route. Every search must hit the backend and return a
+// freshly generated report — we explicitly opt out of all Next.js caching so
+// no stale/old report can ever be served from the edge or data cache.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 // Live FastAPI backend (Vercel project "aria-pi-api"), clean public alias —
 // NOT behind Deployment Protection, so the proxy reaches it without a token.
 //
@@ -30,6 +37,7 @@ export async function POST(req: NextRequest) {
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
+      cache: 'no-store',
     });
 
     clearTimeout(timeout);

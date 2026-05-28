@@ -53,6 +53,9 @@ class ReportBuilder:
             "report_meta": {
                 "sector": sector,
                 "date": datetime.now().strftime("%m/%d/%Y"),
+                # Precise generation time — proves each report is built fresh on
+                # request (never served from a cache or a saved copy).
+                "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
                 "prepared_by": "Research Intelligence Team — Innovate Carolina / UNC Chapel Hill",
                 "version": "Draft",
             },
@@ -357,6 +360,11 @@ class ReportBuilder:
 
         # Concise factual overview — no filler.
         parts = [facts.get("legal_name", c["name"]).rstrip(".") + "."]
+        is_public = facts.get("is_public", bool(facts.get("cik")))
+        if not is_public:
+            parts.append("Privately held — no SEC filings available; "
+                         "coverage below draws only on ClinicalTrials.gov, "
+                         "PubMed, and NIH RePORTER where the company is named.")
         if facts.get("sic"):
             parts.append(f"{facts['sic']}.")
         if facts.get("hq"):
@@ -709,7 +717,12 @@ def _know_company(facts: dict, rev: dict, edgar_url: str) -> dict:
         from_url = rev.get("url", edgar_url)
         bits.append(f"reported FY{rev.get('fy')} revenue of {_fmt_usd(rev['value'])}")
         return {"text": " ".join(bits) + ".", "sources": [from_url, edgar_url]}
-    bits.append(f"is SEC-registered (CIK {facts.get('cik', 'n/a')})")
+    if facts.get("cik"):
+        bits.append(f"is SEC-registered (CIK {facts.get('cik')})")
+    else:
+        # Honest: no CIK means it is not a current SEC filer (private company).
+        bits.append("is privately held with no SEC filings on record; "
+                    "public-source coverage is limited")
     return {"text": " ".join(bits) + ".", "sources": [edgar_url, edgar_url]}
 
 
