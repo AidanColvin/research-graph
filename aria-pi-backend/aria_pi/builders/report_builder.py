@@ -96,10 +96,12 @@ class ReportBuilder:
         sics = sorted({str(s) for c in companies
                        for s in [(c.get("facts", {}) or {}).get("sic")] if s})
         names = [c["name"] for c in companies]
-        total_rev = sum(((c.get("facts", {}) or {}).get("xbrl", {}) or {}).get("revenue", {}).get("value") or 0
-                        for c in companies)
-        total_rd = sum(((c.get("facts", {}) or {}).get("xbrl", {}) or {}).get("rd_expense", {}).get("value") or 0
-                       for c in companies)
+        total_rev = sum(
+            (((c.get("facts") or {}).get("xbrl") or {}).get("revenue") or {}).get("value") or 0
+            for c in companies)
+        total_rd = sum(
+            (((c.get("facts") or {}).get("xbrl") or {}).get("rd_expense") or {}).get("value") or 0
+            for c in companies)
         total_trials = sum(len(c.get("trials") or []) for c in companies)
         total_grants = sum(len(c.get("nih_grants") or []) for c in companies)
         total_papers = sum(len(c.get("pubmed") or []) for c in companies)
