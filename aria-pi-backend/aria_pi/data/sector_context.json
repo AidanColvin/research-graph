@@ -45,7 +45,7 @@
         "url": "https://pharmacy.unc.edu"
       },
       {
-        "unit": "UNC School of Medicine — Department of Pharmacology",
+        "unit": "UNC School of Medicine \u2014 Department of Pharmacology",
         "focus": "Molecular pharmacology and translational therapeutics.",
         "url": "https://www.med.unc.edu/pharm"
       },
@@ -158,7 +158,7 @@
         "url": "https://bio.unc.edu"
       },
       {
-        "unit": "UNC Gillings School of Global Public Health — Nutrition",
+        "unit": "UNC Gillings School of Global Public Health \u2014 Nutrition",
         "focus": "Food systems, nutrition, and population-health intersection with agriculture.",
         "url": "https://sph.unc.edu/nutr/nutrition"
       },
@@ -270,7 +270,7 @@
         "url": "https://pharmacy.unc.edu"
       },
       {
-        "unit": "UNC School of Medicine — Department of Pharmacology",
+        "unit": "UNC School of Medicine \u2014 Department of Pharmacology",
         "focus": "Molecular pharmacology and translational oncology research.",
         "url": "https://www.med.unc.edu/pharm"
       },
@@ -476,6 +476,617 @@
       }
     ]
   },
+  "technology": {
+    "definition": "The technology sector spans companies that design and sell computing hardware, software, semiconductors, internet platforms, and IT services, including consumer electronics, enterprise software, and cloud infrastructure.",
+    "definition_sources": [
+      "https://www.bls.gov/iag/tgs/iag51.htm",
+      "https://www.nist.gov"
+    ],
+    "scale": "Information and communications technology is one of the largest contributors to US private R&D spending; the NSF National Center for Science and Engineering Statistics tracks business R&D, with the software and computing industries among the highest-spending sectors.",
+    "scale_sources": [
+      "https://ncses.nsf.gov",
+      "https://www.bea.gov/data/special-topics/digital-economy"
+    ],
+    "why_now": [
+      {
+        "signal": "The CHIPS and Science Act directs more than $50 billion toward US semiconductor manufacturing and research, reshaping the domestic technology supply chain.",
+        "sources": [
+          "https://www.nist.gov/chips",
+          "https://www.commerce.gov"
+        ]
+      },
+      {
+        "signal": "NIST's AI Risk Management Framework and federal AI guidance are setting evaluation standards that affect platform and software providers.",
+        "sources": [
+          "https://www.nist.gov/itl/ai-risk-management-framework",
+          "https://www.nist.gov/artificial-intelligence"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's Research Triangle is a major US technology hub, anchored by SAS Institute (Cary), IBM and Cisco in RTP, Red Hat (Raleigh), Epic Games (Cary), Lenovo's North America operations (Morrisville), and Apple's planned $1 billion Research Triangle campus.",
+    "nc_context_sources": [
+      "https://www.rtp.org",
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Systems, machine learning, graphics, networking, and security research.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC School of Data Science and Society",
+        "focus": "Data science research, training, and translational analytics across disciplines.",
+        "url": "https://datasciences.unc.edu"
+      },
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Technology commercialization, entrepreneurship, and management of innovation.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "Innovate Carolina",
+        "focus": "UNC's central innovation and entrepreneurship hub coordinating industry partnerships.",
+        "url": "https://innovate.unc.edu"
+      }
+    ]
+  },
+  "software": "alias:technology",
+  "cloud computing": "alias:technology",
+  "internet": "alias:technology",
+  "artificial intelligence": "alias:ai",
+  "machine learning": "alias:ai",
+  "semiconductors": {
+    "definition": "The semiconductor sector designs and manufactures integrated circuits, processors, memory, and related fabrication equipment that power virtually all modern electronics and computing.",
+    "definition_sources": [
+      "https://www.nist.gov/chips",
+      "https://www.bls.gov/iag/tgs/iag334.htm"
+    ],
+    "scale": "The CHIPS and Science Act authorizes roughly $52.7 billion for US semiconductor manufacturing, research, and workforce development administered through NIST and the Department of Commerce.",
+    "scale_sources": [
+      "https://www.nist.gov/chips",
+      "https://www.commerce.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "CHIPS Act incentives are driving new US fabrication plants and a corresponding surge in semiconductor R&D and workforce demand.",
+        "sources": [
+          "https://www.nist.gov/chips",
+          "https://www.commerce.gov"
+        ]
+      },
+      {
+        "signal": "NSF and DOE are expanding microelectronics and advanced-packaging research programs to support domestic chip innovation.",
+        "sources": [
+          "https://www.nsf.gov",
+          "https://www.energy.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's semiconductor footprint is expanding, with Wolfspeed (Durham) a global leader in silicon carbide power devices, and a CHIPS-era push to grow the state's microelectronics workforce through the UNC System and NC State.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.rtp.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Materials science, nanoscience, and device-relevant physical sciences.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Physics and Astronomy",
+        "focus": "Condensed matter physics and materials research underpinning device technology.",
+        "url": "https://physics.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Computer architecture, systems, and hardware-software co-design.",
+        "url": "https://cs.unc.edu"
+      }
+    ]
+  },
+  "cybersecurity": {
+    "definition": "Cybersecurity covers technologies and services that protect networks, systems, applications, and data from digital attack, including endpoint protection, identity, threat detection, and cloud security.",
+    "definition_sources": [
+      "https://www.cisa.gov",
+      "https://www.nist.gov/cybersecurity"
+    ],
+    "scale": "Federal cybersecurity policy is coordinated by CISA and NIST; the NIST Cybersecurity Framework is a widely adopted standard across US industry and government.",
+    "scale_sources": [
+      "https://www.cisa.gov",
+      "https://www.nist.gov/cyberframework"
+    ],
+    "why_now": [
+      {
+        "signal": "CISA's Secure by Design initiative and federal zero-trust mandates are reshaping security requirements for vendors and enterprises.",
+        "sources": [
+          "https://www.cisa.gov/securebydesign",
+          "https://www.cisa.gov"
+        ]
+      },
+      {
+        "signal": "NIST released the updated Cybersecurity Framework 2.0, broadening governance and supply-chain security expectations.",
+        "sources": [
+          "https://www.nist.gov/cyberframework",
+          "https://www.nist.gov/cybersecurity"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's cybersecurity ecosystem is supported by the Research Triangle's IT cluster, a strong defense and banking presence, and university programs feeding security talent into Charlotte's financial sector and RTP technology firms.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.rtp.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Security, privacy, systems, and networking research.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC School of Data Science and Society",
+        "focus": "Data governance, privacy, and applied analytics.",
+        "url": "https://datasciences.unc.edu"
+      },
+      {
+        "unit": "UNC School of Information and Library Science",
+        "focus": "Information security, governance, and information management.",
+        "url": "https://sils.unc.edu"
+      }
+    ]
+  },
+  "fintech": {
+    "definition": "Financial technology covers companies applying software and data to payments, lending, banking, trading, and financial infrastructure, spanning card networks, digital wallets, and embedded finance.",
+    "definition_sources": [
+      "https://www.consumerfinance.gov",
+      "https://www.federalreserve.gov/paymentsystems.htm"
+    ],
+    "scale": "US payments and financial-services technology operate within a multi-trillion-dollar payments system overseen by the Federal Reserve and consumer-protection rules administered by the CFPB.",
+    "scale_sources": [
+      "https://www.federalreserve.gov/paymentsystems.htm",
+      "https://www.consumerfinance.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "The Federal Reserve's FedNow instant-payment service is accelerating real-time payments adoption across the financial sector.",
+        "sources": [
+          "https://www.federalreserve.gov/paymentsystems/fednow_about.htm",
+          "https://www.federalreserve.gov/paymentsystems.htm"
+        ]
+      },
+      {
+        "signal": "CFPB open-banking (personal financial data rights) rulemaking is reshaping data access and competition in consumer finance.",
+        "sources": [
+          "https://www.consumerfinance.gov",
+          "https://www.federalreserve.gov"
+        ]
+      }
+    ],
+    "nc_context": "Charlotte is the second-largest US banking center, headquartering Bank of America and Truist and hosting a major Wells Fargo hub, anchoring a deep fintech and financial-services talent base; the Research Triangle adds payments and software firms.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://charlotteregion.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Finance, capital markets, and fintech entrepreneurship research.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Distributed systems, cryptography, and secure software.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC School of Data Science and Society",
+        "focus": "Quantitative modeling, risk analytics, and data science.",
+        "url": "https://datasciences.unc.edu"
+      }
+    ]
+  },
+  "finance": {
+    "definition": "The financial services sector comprises banks, asset managers, insurers, and capital-markets firms that provide lending, investment, payments, and risk-management services.",
+    "definition_sources": [
+      "https://www.federalreserve.gov",
+      "https://www.sec.gov"
+    ],
+    "scale": "US financial services are regulated by the Federal Reserve, SEC, and other agencies and represent one of the largest contributors to US GDP per Bureau of Economic Analysis industry accounts.",
+    "scale_sources": [
+      "https://www.bea.gov/data/gdp/gdp-industry",
+      "https://www.federalreserve.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Basel III endgame capital rules and evolving SEC disclosure requirements are reshaping bank balance sheets and reporting.",
+        "sources": [
+          "https://www.federalreserve.gov",
+          "https://www.sec.gov"
+        ]
+      },
+      {
+        "signal": "Real-time payments and AI-driven analytics are changing operating models across banking and asset management.",
+        "sources": [
+          "https://www.federalreserve.gov/paymentsystems.htm",
+          "https://www.sec.gov"
+        ]
+      }
+    ],
+    "nc_context": "Charlotte is the second-largest US banking hub, home to Bank of America and Truist headquarters and a major Wells Fargo presence, supported by a dense financial-services workforce across the Charlotte and Triangle regions.",
+    "nc_context_sources": [
+      "https://charlotteregion.com",
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Finance, investment management, and capital-markets research.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Economics",
+        "focus": "Financial economics, econometrics, and markets research.",
+        "url": "https://economics.unc.edu"
+      },
+      {
+        "unit": "UNC School of Data Science and Society",
+        "focus": "Quantitative analytics and risk modeling.",
+        "url": "https://datasciences.unc.edu"
+      }
+    ]
+  },
+  "energy": {
+    "definition": "The energy sector spans electricity generation, transmission, storage, and fuels, increasingly shaped by renewables, grid modernization, and battery technology alongside conventional power.",
+    "definition_sources": [
+      "https://www.energy.gov",
+      "https://www.eia.gov"
+    ],
+    "scale": "The US Department of Energy's FY2024 enacted budget was approximately $50 billion, with substantial funding for clean energy research and deployment through the Office of Science and ARPA-E.",
+    "scale_sources": [
+      "https://www.energy.gov/cfo/articles/department-energy-fy-2024-budget-justifications",
+      "https://www.eia.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "The Inflation Reduction Act and Bipartisan Infrastructure Law direct hundreds of billions toward US clean energy, grid, and storage infrastructure.",
+        "sources": [
+          "https://www.energy.gov/lpo/inflation-reduction-act-2022",
+          "https://www.energy.gov"
+        ]
+      },
+      {
+        "signal": "ARPA-E continues to fund early-stage transformational energy research with annual budgets exceeding $400 million.",
+        "sources": [
+          "https://arpa-e.energy.gov",
+          "https://www.energy.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina is a top US solar-energy state, with Duke Energy headquartered in Charlotte, a growing battery-manufacturing base including Toyota's Liberty plant, and the NC Clean Energy Technology Center at NC State as a regional research hub.",
+    "nc_context_sources": [
+      "https://nccleantech.ncsu.edu",
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Energy materials, storage, and sustainable materials research.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Institute for the Environment",
+        "focus": "Energy, environment, and climate policy research.",
+        "url": "https://ie.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Chemistry",
+        "focus": "Solar fuels, catalysis, and energy-conversion chemistry.",
+        "url": "https://chem.unc.edu"
+      }
+    ]
+  },
+  "automotive": {
+    "definition": "The automotive sector designs and manufactures passenger and commercial vehicles, increasingly centered on electric vehicles, batteries, software-defined vehicles, and autonomy.",
+    "definition_sources": [
+      "https://www.nhtsa.gov",
+      "https://www.energy.gov/eere/vehicles/vehicle-technologies-office"
+    ],
+    "scale": "The US Department of Energy's Vehicle Technologies Office and federal EV incentives under the Inflation Reduction Act support a multi-hundred-billion-dollar transition to electrified transportation.",
+    "scale_sources": [
+      "https://www.energy.gov/eere/vehicles/vehicle-technologies-office",
+      "https://www.energy.gov/lpo/inflation-reduction-act-2022"
+    ],
+    "why_now": [
+      {
+        "signal": "Inflation Reduction Act EV and battery manufacturing credits are driving large new US plant investments.",
+        "sources": [
+          "https://www.energy.gov/lpo/inflation-reduction-act-2022",
+          "https://www.energy.gov"
+        ]
+      },
+      {
+        "signal": "NHTSA is advancing rules and frameworks for advanced driver-assistance and automated-vehicle safety.",
+        "sources": [
+          "https://www.nhtsa.gov",
+          "https://www.transportation.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina is becoming a major EV and battery manufacturing center, with Toyota's multi-billion-dollar battery plant in Liberty and VinFast's planned EV assembly facility in Chatham County anchoring a new mobility cluster.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://nccleantech.ncsu.edu"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Battery materials and energy-storage research.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Autonomy, computer vision, and embedded systems.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Operations, supply chain, and mobility-sector strategy.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      }
+    ]
+  },
+  "aerospace": {
+    "definition": "The aerospace and defense sector designs and manufactures aircraft, spacecraft, defense systems, and related electronics for commercial, civil, and military customers.",
+    "definition_sources": [
+      "https://www.faa.gov",
+      "https://www.defense.gov"
+    ],
+    "scale": "Aerospace and defense is shaped by the multi-hundred-billion-dollar annual US Department of Defense budget and FAA oversight of civil aviation and commercial space.",
+    "scale_sources": [
+      "https://www.defense.gov",
+      "https://www.faa.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Sustained defense budgets and a growing commercial-space sector are expanding demand for advanced aerospace systems and components.",
+        "sources": [
+          "https://www.defense.gov",
+          "https://www.faa.gov/space"
+        ]
+      },
+      {
+        "signal": "NASA and FAA programs continue to advance next-generation aviation, propulsion, and space-launch capabilities.",
+        "sources": [
+          "https://www.nasa.gov",
+          "https://www.faa.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina hosts a significant aerospace and defense presence, including major military installations (Fort Liberty, Seymour Johnson AFB), Honda Aircraft Company's Greensboro headquarters, and a growing aviation manufacturing base.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.ncmilitary.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Physics and Astronomy",
+        "focus": "Aerospace-relevant physics, materials, and instrumentation.",
+        "url": "https://physics.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Advanced materials and engineering science.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Systems, simulation, and autonomy research.",
+        "url": "https://cs.unc.edu"
+      }
+    ]
+  },
+  "robotics": {
+    "definition": "Robotics and automation cover the design and deployment of physical autonomous and semi-autonomous systems for manufacturing, logistics, healthcare, and service applications.",
+    "definition_sources": [
+      "https://www.nist.gov/el/intelligent-systems-division-73500",
+      "https://www.nsf.gov"
+    ],
+    "scale": "Federal robotics and automation research is supported by NSF and NIST programs, with the National Robotics Initiative historically funding collaborative robotics research across US institutions.",
+    "scale_sources": [
+      "https://www.nsf.gov",
+      "https://www.nist.gov/el/intelligent-systems-division-73500"
+    ],
+    "why_now": [
+      {
+        "signal": "Advances in AI and computer vision are accelerating deployment of warehouse, surgical, and industrial robotics.",
+        "sources": [
+          "https://www.nist.gov/el/intelligent-systems-division-73500",
+          "https://www.nsf.gov"
+        ]
+      },
+      {
+        "signal": "Reshoring and labor dynamics are increasing demand for factory and logistics automation.",
+        "sources": [
+          "https://www.commerce.gov",
+          "https://www.nist.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's manufacturing and life-sciences base supports growing automation demand, with surgical-robotics and lab-automation activity tied to the Research Triangle's medical and biotech clusters.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.rtp.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Robotics, computer vision, motion planning, and autonomy.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Mechatronics, materials, and engineering science.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC/NCSU Joint Department of Biomedical Engineering",
+        "focus": "Medical and surgical robotics.",
+        "url": "https://www.bme.unc.edu"
+      }
+    ]
+  },
+  "telecom": {
+    "definition": "Telecommunications covers companies providing voice, data, and internet connectivity over wireless, fiber, and cable networks, plus the equipment that powers them.",
+    "definition_sources": [
+      "https://www.fcc.gov",
+      "https://www.ntia.gov"
+    ],
+    "scale": "US connectivity policy is shaped by the FCC and by tens of billions in federal broadband funding, including the NTIA BEAD program for high-speed internet deployment.",
+    "scale_sources": [
+      "https://www.fcc.gov",
+      "https://www.ntia.gov/page/broadband-equity-access-and-deployment-bead-program"
+    ],
+    "why_now": [
+      {
+        "signal": "The NTIA BEAD program is allocating over $42 billion to expand high-speed broadband across the United States.",
+        "sources": [
+          "https://www.ntia.gov/page/broadband-equity-access-and-deployment-bead-program",
+          "https://www.ntia.gov"
+        ]
+      },
+      {
+        "signal": "Continued 5G and fiber expansion is driving network investment and edge-computing buildouts.",
+        "sources": [
+          "https://www.fcc.gov",
+          "https://www.ntia.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina is investing heavily in broadband expansion through state and federal programs, with networking and connectivity firms in the Research Triangle and a statewide rural-broadband push.",
+    "nc_context_sources": [
+      "https://www.ncbroadband.gov",
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Networking, wireless systems, and distributed computing.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC School of Information and Library Science",
+        "focus": "Information policy, connectivity, and digital access.",
+        "url": "https://sils.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Physics and Astronomy",
+        "focus": "Photonics and signal-relevant physical sciences.",
+        "url": "https://physics.unc.edu"
+      }
+    ]
+  },
+  "retail": {
+    "definition": "The retail and consumer sector covers companies that produce and sell goods to consumers across physical stores, e-commerce, and omnichannel models, including consumer packaged goods.",
+    "definition_sources": [
+      "https://www.census.gov/retail/index.html",
+      "https://www.bls.gov/iag/tgs/iag44-45.htm"
+    ],
+    "scale": "US retail trade is tracked by the Census Bureau's monthly retail sales reports and represents one of the largest segments of consumer spending in the economy.",
+    "scale_sources": [
+      "https://www.census.gov/retail/index.html",
+      "https://www.bea.gov/data/consumer-spending/main"
+    ],
+    "why_now": [
+      {
+        "signal": "E-commerce penetration and AI-driven personalization continue to reshape retail operating and supply-chain models.",
+        "sources": [
+          "https://www.census.gov/retail/index.html",
+          "https://www.commerce.gov"
+        ]
+      },
+      {
+        "signal": "Supply-chain resilience and reshoring are changing sourcing and logistics strategies for consumer goods.",
+        "sources": [
+          "https://www.commerce.gov",
+          "https://www.census.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina hosts major consumer and retail operations, including Lowe's headquarters (Mooresville), a strong logistics and distribution network, and consumer-goods manufacturing across the state.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://charlotteregion.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Marketing, operations, supply chain, and consumer analytics.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "UNC School of Data Science and Society",
+        "focus": "Consumer data analytics and demand modeling.",
+        "url": "https://datasciences.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Economics",
+        "focus": "Consumer economics and market behavior.",
+        "url": "https://economics.unc.edu"
+      }
+    ]
+  },
+  "consumer": "alias:retail",
+  "industrial": {
+    "definition": "The industrial sector covers manufacturers of machinery, equipment, automation systems, and diversified industrial products serving construction, transportation, and other industries.",
+    "definition_sources": [
+      "https://www.bls.gov/iag/tgs/iag31-33.htm",
+      "https://www.nist.gov/mep"
+    ],
+    "scale": "US manufacturing is supported by NIST's Manufacturing Extension Partnership and Manufacturing USA institutes, with manufacturing a major contributor to GDP per Bureau of Economic Analysis accounts.",
+    "scale_sources": [
+      "https://www.nist.gov/mep",
+      "https://www.bea.gov/data/gdp/gdp-industry"
+    ],
+    "why_now": [
+      {
+        "signal": "Reshoring incentives and industrial automation are driving capital investment in US manufacturing.",
+        "sources": [
+          "https://www.nist.gov/mep",
+          "https://www.commerce.gov"
+        ]
+      },
+      {
+        "signal": "Manufacturing USA institutes are advancing advanced-manufacturing and digital-factory technologies.",
+        "sources": [
+          "https://www.manufacturingusa.com",
+          "https://www.nist.gov/mep"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina has a deep advanced-manufacturing base spanning aerospace, vehicles, and machinery, supported by the NC Manufacturing Extension Partnership and a strong community-college workforce pipeline.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.ncmep.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Advanced materials, manufacturing science, and engineering.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Operations management and supply-chain strategy.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Industrial automation, simulation, and systems.",
+        "url": "https://cs.unc.edu"
+      }
+    ]
+  },
   "default": {
     "definition": "[REQUIRES ANALYST] No curated definition available for this sector. The pipeline pulled live data from SEC EDGAR, ClinicalTrials.gov, and PubMed for the named seed companies.",
     "definition_sources": [
@@ -496,7 +1107,7 @@
     "unc_units": [
       {
         "unit": "UNC Research",
-        "focus": "Office of the Vice Chancellor for Research — entry point for industry partnership inquiries.",
+        "focus": "Office of the Vice Chancellor for Research \u2014 entry point for industry partnership inquiries.",
         "url": "https://research.unc.edu"
       },
       {
@@ -505,5 +1116,28 @@
         "url": "https://innovate.unc.edu"
       }
     ]
-  }
+  },
+  "banking": "alias:finance",
+  "bank": "alias:finance",
+  "insurance": "alias:finance",
+  "investment": "alias:finance",
+  "asset management": "alias:finance",
+  "manufacturing": "alias:industrial",
+  "defense": "alias:aerospace",
+  "space": "alias:aerospace",
+  "electric vehicle": "alias:automotive",
+  "ev": "alias:automotive",
+  "clean energy": "alias:climate tech",
+  "renewable energy": "alias:climate tech",
+  "solar": "alias:climate tech",
+  "healthcare": "alias:medtech",
+  "health tech": "alias:medtech",
+  "biomedical": "alias:biotech",
+  "genomics": "alias:biotech",
+  "data science": "alias:technology",
+  "hardware": "alias:technology",
+  "networking": "alias:telecom",
+  "payments": "alias:fintech",
+  "e-commerce": "alias:retail",
+  "ecommerce": "alias:retail"
 }

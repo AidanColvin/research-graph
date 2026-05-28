@@ -17,6 +17,8 @@ import os
 from datetime import datetime
 from typing import Dict, List, Any
 
+from aria_pi.sectors import canonical_sector
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 
@@ -68,19 +70,24 @@ class ReportBuilder:
 
     # ── Section helpers ─────────────────────────────────────────────────────
     def _sector_ctx(self, sector: str) -> dict:
-        key = sector.lower().strip()
-        ctx = self.sector_ctx.get(key)
-        # Follow alias entries (string "alias:<other_key>") up to 3 levels.
-        for _ in range(3):
-            if isinstance(ctx, str) and ctx.startswith("alias:"):
-                ctx = self.sector_ctx.get(ctx.split(":", 1)[1])
-            else:
-                break
-        if isinstance(ctx, dict):
-            return ctx
-        for k, v in self.sector_ctx.items():
-            if k != "default" and isinstance(v, dict) and (k in key or key in k):
-                return v
+        # Normalize via canonical_sector first so "banking" -> "finance", etc.
+        canon = canonical_sector(sector)
+        candidates = [canon, sector.lower().strip()] if canon else [sector.lower().strip()]
+        for key in candidates:
+            if not key:
+                continue
+            ctx = self.sector_ctx.get(key)
+            # Follow alias entries (string "alias:<other_key>") up to 3 levels.
+            for _ in range(3):
+                if isinstance(ctx, str) and ctx.startswith("alias:"):
+                    ctx = self.sector_ctx.get(ctx.split(":", 1)[1])
+                else:
+                    break
+            if isinstance(ctx, dict):
+                return ctx
+            for k, v in self.sector_ctx.items():
+                if k != "default" and isinstance(v, dict) and (k in key or key in k):
+                    return v
         return self.sector_ctx.get("default", {})
 
     def _section1(self, ctx: dict, sector: str, companies: List[dict]) -> dict:
