@@ -2,12 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "aria_pi/orchestrator.py",
+      "src": "api/index.py",
       "use": "@vercel/python",
-      "config": { "maxLambdaSize": "15mb", "maxDuration": 60 }
+      "config": {
+        "maxDuration": 60,
+        "includeFiles": "aria_pi/**"
+      }
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "aria_pi/orchestrator.py" }
+    { "src": "/(.*)", "dest": "api/index.py" }
   ]
 }

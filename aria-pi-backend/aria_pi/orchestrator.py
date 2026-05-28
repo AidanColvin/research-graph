@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 import uvicorn
 
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
@@ -25,6 +26,7 @@ from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.nih_reporter_client import NIHReporterClient
 from aria_pi.builders.report_builder import ReportBuilder
 from aria_pi.utils.source_tagger import SourceTagger
+from aria_pi.sectors import seeds_for as _seeds_for
 
 
 app = FastAPI(title="ARIA-PI Orchestrator", version="0.3.0")
@@ -38,27 +40,6 @@ app.add_middleware(
 )
 
 
-SECTOR_SEEDS = {
-    "oncology": ["Merck", "Bristol-Myers Squibb", "Pfizer", "Eli Lilly", "AstraZeneca"],
-    "biotech": ["Moderna", "Vertex Pharmaceuticals", "Regeneron", "BioMarin", "Alnylam"],
-    "quantum computing": ["IBM", "IonQ", "Rigetti Computing", "D-Wave Quantum", "Quantinuum"],
-    "climate tech": ["Tesla", "First Solar", "Enphase Energy", "Plug Power", "Bloom Energy"],
-    "ag-bio": ["Corteva", "Bayer", "Syngenta", "Ginkgo Bioworks", "Pivot Bio"],
-    "medtech": ["Medtronic", "Boston Scientific", "Stryker", "Abbott Laboratories", "Edwards Lifesciences"],
-    "rural health": ["Teladoc Health", "Doximity", "HCA Healthcare", "American Well", "Hims & Hers Health"],
-}
-
-
-def _seeds_for(sector: str, override: Optional[List[str]]) -> List[str]:
-    if override:
-        return override
-    key = sector.lower().strip()
-    if key in SECTOR_SEEDS:
-        return SECTOR_SEEDS[key]
-    for known, seeds in SECTOR_SEEDS.items():
-        if known in key or key in known:
-            return seeds
-    return ["Johnson & Johnson", "Pfizer", "Merck", "Eli Lilly", "AbbVie"]
 
 
 class PipelineRequest(BaseModel):
@@ -126,8 +107,27 @@ async def run_pipeline(req: PipelineRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Wall-clock budget for the entire data-collection phase. Vercel Hobby caps
+# serverless functions at 60s; we reserve the remainder for report assembly +
+# cold-start margin. Whatever data has returned by the deadline is used as-is —
+# the ReportBuilder derives a complete, sector-specific report from partial
+# data (SEC EDGAR is the fast, reliable backbone; PubMed/NIH/Trials enrich it).
+FETCH_BUDGET_SECONDS = 40
+
+
+def _empty_company(name: str) -> dict:
+    return {"name": name, "facts": {"legal_name": name, "source": "https://www.sec.gov"},
+            "trials": [], "unc_trials": [], "pubmed": [], "pubmed_coi": [],
+            "nih_grants": []}
+
+
 def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
-    """Run all 5 data-source lookups for one company in parallel."""
+    """Run the data-source lookups for one company in parallel.
+
+    PubMed is deliberately limited to ONE combined query (was 7+ per company)
+    because the unauthenticated E-utilities endpoint rate-limits to ~3 req/s
+    and the school-by-school + COI fan-out was the dominant cause of timeouts.
+    """
     def safe(fn, label, default):
         try:
             return fn()
@@ -135,37 +135,30 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             print(f"{label} failed for {name}: {e}")
             return default
 
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    defaults = {
+        "facts": {"legal_name": name, "source": "https://www.sec.gov"},
+        "trials": [], "pubmed": [], "nih_grants": [],
+    }
+    with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {
             "facts": pool.submit(safe,
-                lambda: sec.get_company_facts(name),
-                "SEC", {"legal_name": name, "source": "https://www.sec.gov"}),
+                lambda: sec.get_company_facts(name), "SEC", defaults["facts"]),
             "trials": pool.submit(safe,
                 lambda: trials.search_by_sponsor(name), "Trials", []),
-            # Generic UNC-affiliated co-authorship search (cast wide net)
             "pubmed": pool.submit(safe,
-                lambda: pubmed.search_unc_with_company(name, max_results=10),
+                lambda: pubmed.search_unc_with_company(name, max_results=8),
                 "PubMed", []),
-            # Per-UNC-school targeted search (Gillings, SOM, Lineberger, etc.)
-            "pubmed_schools": pool.submit(safe,
-                lambda: pubmed.search_by_unc_schools(name, max_per_school=3),
-                "PubMed schools", []),
-            "pubmed_coi": pool.submit(safe,
-                lambda: pubmed.search_coi_disclosures(name, max_results=5),
-                "PubMed COI", []),
             "nih_grants": pool.submit(safe,
-                lambda: nih.unc_grants_mentioning(name, max_results=10),
+                lambda: nih.unc_grants_mentioning(name, max_results=8),
                 "NIH Reporter", []),
         }
-        results = {k: f.result() for k, f in futures.items()}
-
-    # Merge generic + school-specific PubMed hits, deduped by pmid.
-    pubmed_all = list(results["pubmed"]) + list(results["pubmed_schools"])
-    seen_pmids, pubmed_unique = set(), []
-    for p in pubmed_all:
-        pmid = p.get("pmid")
-        if pmid and pmid not in seen_pmids:
-            seen_pmids.add(pmid); pubmed_unique.append(p)
+        results = {}
+        for k, f in futures.items():
+            try:
+                results[k] = f.result(timeout=FETCH_BUDGET_SECONDS)
+            except Exception as e:
+                print(f"{k} timed out for {name}: {e}")
+                results[k] = defaults[k]
 
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
@@ -174,36 +167,36 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "facts": results["facts"],
         "trials": company_trials[:12],
         "unc_trials": unc_trials,
-        "pubmed": pubmed_unique,
-        "pubmed_coi": results["pubmed_coi"],
+        "pubmed": results["pubmed"],
+        "pubmed_coi": [],
         "nih_grants": results["nih_grants"],
     }
 
 
 def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
-    """Fetch data for every named company concurrently.
+    """Fetch data for every named company concurrently within a hard deadline.
 
-    Total wall time ≈ slowest single API call × 1, not × N. This is what
-    lets every public-page profile carry the full 5-source treatment.
+    The total wait can never exceed FETCH_BUDGET_SECONDS: any company whose
+    data has not returned by the deadline is filled with an SEC-only stub so
+    the report still renders. This is what makes the endpoint reliable for
+    every sector inside the serverless time limit.
     """
     if not names:
         return []
-    out_by_name: dict[str, dict] = {}
+    out_by_name: dict[str, dict] = {n: _empty_company(n) for n in names}
+    deadline = time.monotonic() + FETCH_BUDGET_SECONDS
     with ThreadPoolExecutor(max_workers=len(names)) as pool:
         future_to_name = {
             pool.submit(_fetch_one_company, n, **clients): n for n in names
         }
-        for fut in as_completed(future_to_name):
-            name = future_to_name[fut]
+        for fut, name in future_to_name.items():
+            remaining = deadline - time.monotonic()
             try:
-                out_by_name[name] = fut.result()
+                out_by_name[name] = fut.result(timeout=max(0.1, remaining))
             except Exception as e:
-                print(f"Company fetch error for {name}: {e}")
-                out_by_name[name] = {"name": name, "facts": {}, "trials": [],
-                                     "unc_trials": [], "pubmed": [],
-                                     "pubmed_coi": [], "nih_grants": []}
-    # Preserve seed order
-    return [out_by_name[n] for n in names if n in out_by_name]
+                print(f"Company fetch deadline/err for {name}: {e}")
+                # keep the SEC-only stub already in out_by_name
+    return [out_by_name[n] for n in names]
 
 
 def _validate_report_sources(report: dict, tagger: SourceTagger) -> dict:

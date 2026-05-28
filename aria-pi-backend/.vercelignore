@@ -1,0 +1,11 @@
+.venv
+.pytest_cache
+test-results
+.coverage
+aria_pi/tests
+__pycache__
+*.pyc
+GENERATE_TESTS_PROMPT.txt
+run_tests.sh
+render.yaml
+Procfile
