@@ -204,9 +204,7 @@ export default function Report({ data }: { data: ReportData }) {
                 <strong>{v.unverified}</strong> flagged for analyst review
               </span>
             )}
-            {data._stub && (
-              <span style={styles.stubBadge}>STUB MODE — set ANTHROPIC_API_KEY for live data</span>
-            )}
+            <span style={styles.modeBadge}>FREE TIER · SEC + Trials + PubMed</span>
           </div>
         )}
       </header>
@@ -594,12 +592,12 @@ const styles: Record<string, CSSProperties> = {
     color: '#374151',
   },
   verifyStat: { fontSize: 13 },
-  stubBadge: {
+  modeBadge: {
     fontSize: 11,
     fontWeight: 700,
     letterSpacing: '0.08em',
-    color: '#b91c1c',
-    background: '#fee2e2',
+    color: '#166534',
+    background: '#dcfce7',
     padding: '2px 8px',
     borderRadius: 999,
   },

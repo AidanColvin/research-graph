@@ -1,12 +1,52 @@
 [
   {
     "name": "Carolina Data Warehouse for Health (CDWH)",
-    "description": "Central repository containing clinical, research, and administrative data from the UNC Health Care System.",
-    "relevance_keywords": ["electronic health records", "ehr", "clinical informatics", "patient cohorts"]
+    "description": "Enterprise clinical data warehouse containing structured and unstructured records from UNC Health, including EHR data, lab results, imaging metadata, and administrative records.",
+    "held_by": "NC TraCS Institute / UNC Health",
+    "relevance_keywords": ["electronic health records", "ehr", "clinical informatics", "patient cohorts", "real-world data"],
+    "sources": [
+      "https://tracs.unc.edu/index.php/services/informatics-and-data-science/cdw-h",
+      "https://www.med.unc.edu"
+    ]
   },
   {
-    "name": "Rural Health Data Cohorts",
-    "description": "Extensive longitudinal data representing rural patient populations across North Carolina.",
-    "relevance_keywords": ["rural health", "population health", "demographics"]
+    "name": "NC AHEC Network Data",
+    "description": "Statewide network of regional health education centers serving primarily rural and underserved populations across approximately 80 NC counties.",
+    "held_by": "NC AHEC Program",
+    "relevance_keywords": ["rural health", "population health", "workforce", "primary care", "telehealth"],
+    "sources": [
+      "https://www.ncahec.net",
+      "https://www.ncahec.net/about"
+    ]
+  },
+  {
+    "name": "UNC Lineberger Cancer Registry",
+    "description": "Hospital-based cancer registry capturing diagnosis, treatment, and outcomes data for patients seen at UNC Lineberger.",
+    "held_by": "UNC Lineberger Comprehensive Cancer Center",
+    "relevance_keywords": ["oncology", "cancer", "outcomes", "registry"],
+    "sources": [
+      "https://unclineberger.org",
+      "https://unclineberger.org/about"
+    ]
+  },
+  {
+    "name": "UNC Biospecimen Processing Facility",
+    "description": "Centralized biorepository for research-grade tissue, blood, and biofluid samples supporting translational research.",
+    "held_by": "UNC School of Medicine",
+    "relevance_keywords": ["biospecimens", "biobank", "translational research", "tissue", "blood"],
+    "sources": [
+      "https://www.med.unc.edu/bsp",
+      "https://www.med.unc.edu"
+    ]
+  },
+  {
+    "name": "UNC Sheps Center Rural Health Research Data",
+    "description": "Research datasets and analyses produced by the Cecil G. Sheps Center for Health Services Research, including the NC Rural Health Research Program.",
+    "held_by": "Cecil G. Sheps Center for Health Services Research",
+    "relevance_keywords": ["rural health", "health policy", "health services research", "hospital closures"],
+    "sources": [
+      "https://www.shepscenter.unc.edu",
+      "https://www.shepscenter.unc.edu/programs-projects/rural-health"
+    ]
   }
 ]

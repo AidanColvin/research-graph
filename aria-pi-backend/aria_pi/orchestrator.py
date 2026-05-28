@@ -1,11 +1,15 @@
-"""ARIA-PI Orchestrator — full partnership intelligence pipeline.
+"""ARIA-PI Orchestrator — free, no API keys.
 
 Flow per request:
-  1. Fetch real data from SEC EDGAR + ClinicalTrials.gov for seed companies in the sector.
-  2. Pass that data to Claude with strict sourcing instructions.
-  3. Claude returns a structured JSON report following the template.
-  4. SourceTagger validates claims against the blocklist.
-  5. Return JSON to the frontend.
+  1. Pick seed companies for the sector (curated list).
+  2. Fetch real, citable data per company from free public APIs:
+       • SEC EDGAR submissions  (facts + recent filings)
+       • ClinicalTrials.gov v2  (pipeline)
+       • PubMed (Entrez)        (UNC alignment / co-authorship)
+  3. Hand to the deterministic ReportBuilder which assembles the
+     7-section report using real URLs as sources.
+  4. Validate sources against the blocklist (no Wikipedia / aggregators).
+  5. Return the report.
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,11 +19,17 @@ import uvicorn
 
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
-from aria_pi.clients.claude_client import ClaudeClient
+from aria_pi.builders.report_builder import ReportBuilder
 from aria_pi.utils.source_tagger import SourceTagger
 
+try:
+    from aria_pi.clients.pubmed_client import PubMedClient
+    HAS_PUBMED = True
+except Exception:
+    HAS_PUBMED = False
 
-app = FastAPI(title="ARIA-PI Orchestrator", version="0.2.0")
+
+app = FastAPI(title="ARIA-PI Orchestrator", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,17 +40,14 @@ app.add_middleware(
 )
 
 
-# ── Sector → seed company candidates ──────────────────────────────────────────
-# Used when no explicit companies are passed. Keeps the demo flow alive while
-# the BD team builds out their own seed list per sector.
 SECTOR_SEEDS = {
     "oncology": ["Merck", "Bristol-Myers Squibb", "Pfizer", "Eli Lilly", "AstraZeneca"],
     "biotech": ["Moderna", "Vertex Pharmaceuticals", "Regeneron", "BioMarin", "Alnylam"],
-    "quantum computing": ["IBM", "IonQ", "Rigetti Computing", "D-Wave", "Quantinuum"],
+    "quantum computing": ["IBM", "IonQ", "Rigetti Computing", "D-Wave Quantum", "Quantinuum"],
     "climate tech": ["Tesla", "First Solar", "Enphase Energy", "Plug Power", "Bloom Energy"],
     "ag-bio": ["Corteva", "Bayer", "Syngenta", "Ginkgo Bioworks", "Pivot Bio"],
-    "medtech": ["Medtronic", "Boston Scientific", "Stryker", "Abbott", "Edwards Lifesciences"],
-    "rural health": ["Teladoc", "Doximity", "HCA Healthcare", "Amwell", "Hims & Hers"],
+    "medtech": ["Medtronic", "Boston Scientific", "Stryker", "Abbott Laboratories", "Edwards Lifesciences"],
+    "rural health": ["Teladoc Health", "Doximity", "HCA Healthcare", "American Well", "Hims & Hers Health"],
 }
 
 
@@ -50,11 +57,9 @@ def _seeds_for(sector: str, override: Optional[List[str]]) -> List[str]:
     key = sector.lower().strip()
     if key in SECTOR_SEEDS:
         return SECTOR_SEEDS[key]
-    # Best-effort fuzzy match
     for known, seeds in SECTOR_SEEDS.items():
         if known in key or key in known:
             return seeds
-    # Generic fallback so the pipeline still runs on unknown sectors
     return ["Johnson & Johnson", "Pfizer", "Merck", "Eli Lilly", "AbbVie"]
 
 
@@ -66,54 +71,61 @@ class PipelineRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"service": "ARIA-PI", "version": "0.2.0", "endpoints": ["/status", "/run-pipeline"]}
+    return {"service": "ARIA-PI", "version": "0.3.0",
+            "endpoints": ["/status", "/run-pipeline"]}
 
 
 @app.get("/status")
 async def get_status():
-    claude = ClaudeClient()
     return {
         "status": "online",
-        "claude_live": claude.is_live,
-        "model": claude.model,
-        "modules_loaded": ["SEC EDGAR", "ClinicalTrials.gov", "PubMed", "SourceTagger", "Claude"],
+        "mode": "free — no API keys required",
+        "data_sources": ["SEC EDGAR", "ClinicalTrials.gov", "PubMed (Entrez)"],
     }
 
 
 @app.post("/run-pipeline")
 async def run_pipeline(req: PipelineRequest):
-    """Generate a full partnership intelligence report for the requested sector."""
     try:
         sec = SECEdgarClient()
         trials = ClinicalTrialsClient()
         tagger = SourceTagger()
-        claude = ClaudeClient()
+        builder = ReportBuilder()
+        pubmed = PubMedClient() if HAS_PUBMED else None
 
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds = _seeds_for(req.sector, override)
 
-        # 1. Fetch real, attributable data per seed company
+        # 1. Real data collection per company
         company_data = []
         for name in seeds[:5]:
             facts = sec.get_company_facts(name)
             company_trials = trials.search_by_sponsor(name)
+            papers: list = []
+            if pubmed:
+                try:
+                    papers = pubmed.search_by_affiliation(
+                        query=f"{name}", affiliation="UNC Chapel Hill", max_results=5
+                    )
+                except Exception as e:
+                    print(f"PubMed lookup failed for {name}: {e}")
+                    papers = []
             company_data.append({
                 "name": name,
                 "facts": facts,
-                "trials": company_trials[:5],
+                "trials": company_trials[:8],
+                "pubmed": papers,
             })
 
-        # 2. Hand to Claude for structured synthesis
-        real_data = {"sector": req.sector, "companies": company_data}
-        report = claude.generate_report(req.sector, real_data)
+        # 2. Deterministic synthesis
+        report = builder.build(req.sector, {"sector": req.sector, "companies": company_data})
 
-        # 3. Validate every sourced claim against the blocklist
-        validation = _validate_report_sources(report, tagger)
-        report["_validation"] = validation
+        # 3. Source-blocklist validation
+        report["_validation"] = _validate_report_sources(report, tagger)
         report["_meta"] = {
-            "claude_live": claude.is_live,
-            "model": claude.model,
+            "mode": "free",
             "seed_companies": seeds[:5],
+            "pubmed_enabled": bool(pubmed),
         }
 
         return {"sector": req.sector, "status": "COMPLETED", "data": report}
@@ -125,7 +137,6 @@ async def run_pipeline(req: PipelineRequest):
 
 
 def _validate_report_sources(report: dict, tagger: SourceTagger) -> dict:
-    """Walk the report and flag any claim whose sources fail the 2-source rule."""
     issues: List[dict] = []
     valid = 0
     total = 0

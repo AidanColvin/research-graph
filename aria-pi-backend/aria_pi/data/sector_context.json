@@ -1,0 +1,289 @@
+{
+  "oncology": {
+    "definition": "Oncology is the branch of medicine dealing with the prevention, diagnosis, and treatment of cancer, encompassing therapeutic modalities including chemotherapy, radiation oncology, surgical oncology, immunotherapy, and targeted therapies.",
+    "definition_sources": [
+      "https://www.cancer.gov/about-cancer",
+      "https://www.fda.gov/about-fda/center-drug-evaluation-and-research-cder/oncology-center-excellence"
+    ],
+    "scale": "The National Cancer Institute's FY2024 enacted budget was approximately $7.22 billion supporting cancer research and infrastructure across the United States.",
+    "scale_sources": [
+      "https://www.cancer.gov/about-nci/budget",
+      "https://www.nih.gov/about-nih/what-we-do/budget"
+    ],
+    "why_now": [
+      {
+        "signal": "FDA Oncology Center of Excellence continues to advance breakthrough designations and accelerated approvals for novel oncology therapeutics.",
+        "sources": [
+          "https://www.fda.gov/about-fda/oncology-center-excellence",
+          "https://www.fda.gov/drugs/development-approval-process-drugs/drug-approvals-and-databases"
+        ]
+      },
+      {
+        "signal": "NIH National Cancer Institute funded over $5 billion in extramural cancer research grants in recent fiscal years, sustaining a substantial research pipeline.",
+        "sources": [
+          "https://reporter.nih.gov",
+          "https://www.cancer.gov/about-nci/budget"
+        ]
+      },
+      {
+        "signal": "Cell and gene therapy approvals (CAR-T, antibody-drug conjugates) have expanded the addressable patient population and partnership opportunities.",
+        "sources": [
+          "https://www.fda.gov/vaccines-blood-biologics/cellular-gene-therapy-products",
+          "https://clinicaltrials.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina hosts a dense oncology research and industry ecosystem anchored by Research Triangle Park, the UNC Lineberger Comprehensive Cancer Center (an NCI-designated Comprehensive Cancer Center), and Duke Cancer Institute. The state's biomanufacturing sector includes major oncology-relevant facilities operated by Grifols, Biogen, and FUJIFILM Diosynth Biotechnologies.",
+    "nc_context_sources": [
+      "https://www.ncbiotech.org",
+      "https://unclineberger.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Lineberger Comprehensive Cancer Center",
+        "focus": "NCI-designated comprehensive cancer center conducting basic, translational, clinical, and population research.",
+        "url": "https://unclineberger.org"
+      },
+      {
+        "unit": "UNC Eshelman School of Pharmacy",
+        "focus": "Pharmaceutical sciences, drug discovery, and clinical pharmacology with oncology drug development programs.",
+        "url": "https://pharmacy.unc.edu"
+      },
+      {
+        "unit": "UNC School of Medicine — Department of Pharmacology",
+        "focus": "Molecular pharmacology and translational oncology research.",
+        "url": "https://www.med.unc.edu/pharm"
+      },
+      {
+        "unit": "UNC Institute for Pharmacogenomics and Individualized Therapy",
+        "focus": "Pharmacogenomics-driven precision medicine including oncology drug response.",
+        "url": "https://pharmacy.unc.edu/research/centers/iipit"
+      }
+    ]
+  },
+  "biotech": {
+    "definition": "Biotechnology encompasses the use of biological systems, organisms, or derivatives to develop products and processes spanning therapeutics, diagnostics, agriculture, and industrial applications.",
+    "definition_sources": [
+      "https://www.nih.gov/about-nih/what-we-do/nih-almanac",
+      "https://www.fda.gov/vaccines-blood-biologics"
+    ],
+    "scale": "The NIH FY2024 enacted budget was approximately $47.1 billion, funding a substantial portion of US biomedical research that underpins the biotech sector.",
+    "scale_sources": [
+      "https://www.nih.gov/about-nih/what-we-do/budget",
+      "https://reporter.nih.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "mRNA therapeutic platforms validated by COVID-19 vaccines have expanded into oncology and rare disease pipelines.",
+        "sources": [
+          "https://clinicaltrials.gov",
+          "https://www.fda.gov/vaccines-blood-biologics"
+        ]
+      },
+      {
+        "signal": "FDA cell and gene therapy approvals continue to grow, with multiple novel products approved in recent years.",
+        "sources": [
+          "https://www.fda.gov/vaccines-blood-biologics/cellular-gene-therapy-products",
+          "https://www.fda.gov/drugs/development-approval-process-drugs"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's Research Triangle Park is one of the largest biotech clusters in the United States, with major presences from Biogen, GSK, Grifols, FUJIFILM Diosynth, and Eli Lilly's Concord manufacturing facility.",
+    "nc_context_sources": [
+      "https://www.ncbiotech.org",
+      "https://www.rtp.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Eshelman School of Pharmacy",
+        "focus": "Drug discovery, pharmaceutical sciences, and translational research.",
+        "url": "https://pharmacy.unc.edu"
+      },
+      {
+        "unit": "UNC School of Medicine",
+        "focus": "Translational biomedical research across therapeutic areas.",
+        "url": "https://www.med.unc.edu"
+      },
+      {
+        "unit": "UNC Lineberger Comprehensive Cancer Center",
+        "focus": "Translational cancer therapeutics and biomarker discovery.",
+        "url": "https://unclineberger.org"
+      },
+      {
+        "unit": "NC TraCS Institute",
+        "focus": "Clinical and translational science infrastructure supporting biomedical innovation.",
+        "url": "https://tracs.unc.edu"
+      }
+    ]
+  },
+  "rural health": {
+    "definition": "Rural health focuses on the delivery and outcomes of health care services in non-urban populations, addressing access disparities, workforce shortages, and chronic disease burden.",
+    "definition_sources": [
+      "https://www.hrsa.gov/rural-health",
+      "https://www.cdc.gov/ruralhealth"
+    ],
+    "scale": "HRSA's Federal Office of Rural Health Policy administers programs supporting rural health systems across the United States; rural Americans comprise approximately 14% of the US population per Census data.",
+    "scale_sources": [
+      "https://www.hrsa.gov/rural-health",
+      "https://www.census.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "HRSA continues to expand rural residency, telehealth, and broadband programs through the Federal Office of Rural Health Policy.",
+        "sources": [
+          "https://www.hrsa.gov/rural-health",
+          "https://www.hrsa.gov/grants"
+        ]
+      },
+      {
+        "signal": "CDC Office of Rural Health is investing in chronic disease and substance use disorder interventions in rural communities.",
+        "sources": [
+          "https://www.cdc.gov/ruralhealth",
+          "https://www.cdc.gov/ruralhealth/about.html"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina has approximately 80 rural counties served by the NC AHEC (Area Health Education Centers) program, with UNC Health operating as the state's safety-net academic health system reaching rural populations through telehealth and regional clinics.",
+    "nc_context_sources": [
+      "https://www.ncahec.net",
+      "https://www.unchealth.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Gillings School of Global Public Health",
+        "focus": "Rural and population health research, health policy, and implementation science.",
+        "url": "https://sph.unc.edu"
+      },
+      {
+        "unit": "Cecil G. Sheps Center for Health Services Research",
+        "focus": "Rural health services research, including the NC Rural Health Research Program.",
+        "url": "https://www.shepscenter.unc.edu"
+      },
+      {
+        "unit": "NC AHEC Program",
+        "focus": "Statewide network supporting health workforce training and rural service delivery.",
+        "url": "https://www.ncahec.net"
+      }
+    ]
+  },
+  "climate tech": {
+    "definition": "Climate tech encompasses technologies that mitigate greenhouse gas emissions or enable adaptation to climate change, spanning energy generation, storage, carbon management, agriculture, and industrial decarbonization.",
+    "definition_sources": [
+      "https://www.energy.gov/science-innovation/climate-change",
+      "https://www.epa.gov/climate-change"
+    ],
+    "scale": "The US Department of Energy's FY2024 enacted budget was approximately $50 billion, with substantial allocations toward clean energy research and demonstration programs administered through ARPA-E and the Office of Science.",
+    "scale_sources": [
+      "https://www.energy.gov/cfo/articles/department-energy-fy-2024-budget-justifications",
+      "https://arpa-e.energy.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Inflation Reduction Act and Bipartisan Infrastructure Law together direct hundreds of billions toward US clean energy and climate infrastructure.",
+        "sources": [
+          "https://www.energy.gov/lpo/inflation-reduction-act-2022",
+          "https://www.whitehouse.gov/cleanenergy"
+        ]
+      },
+      {
+        "signal": "ARPA-E continues to fund early-stage transformational energy research with annual budgets exceeding $400 million.",
+        "sources": [
+          "https://arpa-e.energy.gov",
+          "https://www.energy.gov/cfo/articles/department-energy-fy-2024-budget-justifications"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina hosts a growing climate tech sector including Toyota's battery manufacturing facility, VinFast EV production, and substantial solar capacity, with the NC Clean Energy Technology Center based at NC State serving as a regional research hub.",
+    "nc_context_sources": [
+      "https://nccleantech.ncsu.edu",
+      "https://www.ncbiotech.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Institute for the Environment",
+        "focus": "Interdisciplinary environmental science, policy, and climate research.",
+        "url": "https://ie.unc.edu"
+      },
+      {
+        "unit": "UNC Gillings School of Global Public Health",
+        "focus": "Environmental health sciences and climate-health intersection research.",
+        "url": "https://sph.unc.edu"
+      }
+    ]
+  },
+  "quantum computing": {
+    "definition": "Quantum computing uses quantum-mechanical phenomena (superposition, entanglement) to perform computation, with potential applications spanning cryptography, materials science, drug discovery, and optimization.",
+    "definition_sources": [
+      "https://www.energy.gov/science/articles/doe-explains-quantum-computing",
+      "https://www.nist.gov/topics/quantum-information-science"
+    ],
+    "scale": "The US National Quantum Initiative authorized over $1.2 billion in federal quantum research funding through agencies including DOE, NSF, and NIST.",
+    "scale_sources": [
+      "https://www.quantum.gov",
+      "https://www.energy.gov/science/articles/department-energy-announces-625-million-five-quantum-information-science"
+    ],
+    "why_now": [
+      {
+        "signal": "DOE National Quantum Information Science Research Centers anchor a coordinated federal investment in quantum hardware and algorithms.",
+        "sources": [
+          "https://www.energy.gov/science/quantum-information-science",
+          "https://www.quantum.gov"
+        ]
+      },
+      {
+        "signal": "NIST is finalizing post-quantum cryptography standards, accelerating industry adoption of quantum-resistant security.",
+        "sources": [
+          "https://www.nist.gov/news-events/news/2024/08/nist-releases-first-3-finalized-post-quantum-encryption-standards",
+          "https://www.nist.gov/pqcrypto"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's quantum research ecosystem includes activity at Duke University's Quantum Center and IBM partnerships through the broader Research Triangle region, with growing interest from RTI International and SAS in quantum-adjacent computing.",
+    "nc_context_sources": [
+      "https://quantum.duke.edu",
+      "https://www.rti.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Physics and Astronomy",
+        "focus": "Condensed matter and quantum information research.",
+        "url": "https://physics.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Algorithms, cryptography, and computational research.",
+        "url": "https://cs.unc.edu"
+      }
+    ]
+  },
+  "default": {
+    "definition": "[REQUIRES ANALYST] No curated definition available for this sector. The pipeline pulled live data from SEC EDGAR, ClinicalTrials.gov, and PubMed for the named seed companies.",
+    "definition_sources": [
+      "https://www.sec.gov",
+      "https://clinicaltrials.gov"
+    ],
+    "scale": "[REQUIRES ANALYST] Market scale figures should be sourced from a sector-specific government database or peer-reviewed journal.",
+    "scale_sources": [
+      "https://reporter.nih.gov",
+      "https://www.sec.gov"
+    ],
+    "why_now": [],
+    "nc_context": "[REQUIRES ANALYST] NC-specific industry context not curated for this sector. Check NC Biotechnology Center and EDPNC sector reports.",
+    "nc_context_sources": [
+      "https://www.ncbiotech.org",
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Research",
+        "focus": "Office of the Vice Chancellor for Research — entry point for industry partnership inquiries.",
+        "url": "https://research.unc.edu"
+      },
+      {
+        "unit": "Innovate Carolina",
+        "focus": "UNC's central innovation and entrepreneurship hub coordinating industry partnerships.",
+        "url": "https://innovate.unc.edu"
+      }
+    ]
+  }
+}

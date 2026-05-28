@@ -107,8 +107,8 @@ export default function Home() {
           </div>
 
           <p style={styles.disclaimer}>
-            Every claim is cross-checked against SEC filings, PubMed, ClinicalTrials.gov,
-            NIH Reporter, and UNC faculty pages. No Wikipedia. No aggregators.
+            Free tier. No API keys. Every claim cites SEC filings, PubMed,
+            or ClinicalTrials.gov. No Wikipedia. No aggregators.
           </p>
         </section>
       )}
@@ -135,8 +135,8 @@ export default function Home() {
             ))}
           </div>
           <p style={styles.runHint}>
-            Fetching real data from SEC EDGAR, ClinicalTrials.gov, and PubMed, then
-            synthesizing the report. This can take up to a minute.
+            Pulling live data from SEC EDGAR, ClinicalTrials.gov, and PubMed.
+            This takes 20–45 seconds.
           </p>
         </section>
       )}

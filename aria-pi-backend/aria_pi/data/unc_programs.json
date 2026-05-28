@@ -1,0 +1,93 @@
+{
+  "talent_programs": [
+    {
+      "program": "Eshelman School of Pharmacy PharmD",
+      "school": "UNC Eshelman School of Pharmacy",
+      "output": "Pharmacy doctoral graduates trained in pharmaceutical sciences, clinical pharmacology, and drug development.",
+      "sources": [
+        "https://pharmacy.unc.edu/education/pharmd",
+        "https://pharmacy.unc.edu"
+      ]
+    },
+    {
+      "program": "Gillings MPH and MSPH",
+      "school": "UNC Gillings School of Global Public Health",
+      "output": "Master's-level public health graduates across epidemiology, biostatistics, health policy, and environmental health.",
+      "sources": [
+        "https://sph.unc.edu/students/programs",
+        "https://sph.unc.edu"
+      ]
+    },
+    {
+      "program": "Carolina Health Informatics Program (CHIP)",
+      "school": "UNC School of Information and Library Science",
+      "output": "Graduate program training health informatics specialists.",
+      "sources": [
+        "https://chip.unc.edu",
+        "https://sils.unc.edu"
+      ]
+    },
+    {
+      "program": "UNC School of Medicine MD-PhD",
+      "school": "UNC School of Medicine",
+      "output": "Physician-scientist graduates trained in clinical care and biomedical research.",
+      "sources": [
+        "https://www.med.unc.edu/md-phd",
+        "https://www.med.unc.edu"
+      ]
+    }
+  ],
+  "nc_access": [
+    {
+      "asset": "UNC Health",
+      "description": "Academic health system operating hospitals and clinics across North Carolina, with research partnerships through NC TraCS.",
+      "sources": [
+        "https://www.unchealth.org",
+        "https://tracs.unc.edu"
+      ]
+    },
+    {
+      "asset": "NC AHEC Network",
+      "description": "Statewide rural and community health network supporting training, telehealth, and access for partner research.",
+      "sources": [
+        "https://www.ncahec.net",
+        "https://www.ncahec.net/about"
+      ]
+    },
+    {
+      "asset": "NC TraCS Institute",
+      "description": "Clinical and translational science institute, NIH CTSA-funded hub for industry-academic clinical research collaboration.",
+      "sources": [
+        "https://tracs.unc.edu",
+        "https://ncats.nih.gov/ctsa"
+      ]
+    }
+  ],
+  "partnership_models": [
+    {
+      "model": "Sponsored Research Agreement",
+      "description": "Company funds a defined UNC research project with deliverables and IP terms.",
+      "unit": "UNC Office of Sponsored Research"
+    },
+    {
+      "model": "License / IP Commercialization",
+      "description": "UNC licenses a patent or technology to the company.",
+      "unit": "UNC Office of Technology Commercialization"
+    },
+    {
+      "model": "Data Access Agreement",
+      "description": "Company accesses a named UNC dataset under a formal agreement.",
+      "unit": "NC TraCS Institute"
+    },
+    {
+      "model": "Fellowship or Internship Placement",
+      "description": "Company hosts a UNC student in a structured training program.",
+      "unit": "Innovate Carolina"
+    },
+    {
+      "model": "Clinical Research Collaboration",
+      "description": "Company conducts a trial or study through UNC Health and NC TraCS.",
+      "unit": "UNC Health / NC TraCS"
+    }
+  ]
+}
