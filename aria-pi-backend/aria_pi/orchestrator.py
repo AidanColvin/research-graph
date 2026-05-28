@@ -76,12 +76,10 @@ async def run_pipeline(req: PipelineRequest):
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds = _seeds_for(req.sector, override)
 
-        # 1. Real data collection per company — runs ALL 5 sources in parallel
-        # for ALL 5 candidate companies (5 × 5 = 25 concurrent HTTP calls), so
-        # the full source treatment lands every profile within the Vercel
-        # 60s function budget.
+        # 1. Real data collection per company — runs all sources in parallel
+        # for up to 10 candidate companies within the Vercel 60s budget.
         company_data = _fetch_all_concurrent(
-            seeds[:5], sec=sec, trials=trials, pubmed=pubmed, nih=nih
+            seeds[:10], sec=sec, trials=trials, pubmed=pubmed, nih=nih
         )
 
         # 2. Deterministic synthesis
@@ -91,7 +89,7 @@ async def run_pipeline(req: PipelineRequest):
         report["_validation"] = _validate_report_sources(report, tagger)
         report["_meta"] = {
             "mode": "free",
-            "seed_companies": seeds[:5],
+            "seed_companies": seeds[:10],
             "pubmed_enabled": bool(pubmed),
         }
 
