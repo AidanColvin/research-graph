@@ -116,7 +116,7 @@ async def run_pipeline(req: PipelineRequest):
 # cold-start margin. Whatever data has returned by the deadline is used as-is —
 # the ReportBuilder derives a complete, sector-specific report from partial
 # data (SEC EDGAR is the fast, reliable backbone; PubMed/NIH/Trials enrich it).
-FETCH_BUDGET_SECONDS = 40
+FETCH_BUDGET_SECONDS = 44
 
 
 def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:

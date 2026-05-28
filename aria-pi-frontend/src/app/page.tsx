@@ -19,7 +19,7 @@ const SECTORS = [
   'Technology', 'Software', 'Artificial Intelligence', 'Semiconductors',
   'Cybersecurity', 'Cloud Computing', 'Fintech', 'Quantum Computing', 'Robotics',
   'Telecom', 'Climate Tech', 'Energy', 'Automotive', 'Aerospace', 'Consumer',
-  'Retail', 'Finance', 'Industrial',
+  'Retail', 'Finance', 'Insurance', 'Industrial',
 ];
 
 // First sector whose name starts with what's typed (case-insensitive).
@@ -46,9 +46,12 @@ export default function Home() {
     setData(null);
     setStageIdx(0);
 
+    // Pace the visible stages to the real backend work (live SEC/PubMed/NIH/
+    // trials fetches take tens of seconds). Advancing slowly keeps the progress
+    // screen honest instead of racing to "done" while data is still loading.
     const tick = setInterval(() => {
       setStageIdx((i) => (i < STAGES.length - 1 ? i + 1 : i));
-    }, 1800);
+    }, 6000);
 
     try {
       const controller = new AbortController();
