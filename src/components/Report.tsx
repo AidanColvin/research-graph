@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties } from 'react';
+import React, { CSSProperties } from 'react';
 
 type Sourced = { text: string; sources: string[] };
 type SourceList = string[];
@@ -62,66 +62,167 @@ export type ReportData = {
   _stub?: boolean;
 };
 
-// ── Source badge: classifies the URL and colors it ────────────────────────────
-function sourceMeta(url: string): { label: string; color: string; bg: string } {
+// ── AMA citation index ─────────────────────────────────────────────────────────
+type CitationIndex = {
+  numberOf: (url: string) => number;
+  list: { id: number; url: string; ama: string }[];
+};
+
+const TODAY = new Date().toLocaleDateString('en-US', {
+  year: 'numeric', month: 'long', day: 'numeric',
+});
+
+// Format a single URL as an AMA citation (best-effort from URL structure).
+function amaFormat(url: string): string {
   const u = (url || '').toLowerCase();
-  if (u.includes('sec.gov')) return { label: 'SEC', color: '#1e40af', bg: '#dbeafe' };
-  if (u.includes('pubmed') || u.includes('ncbi')) return { label: 'PubMed', color: '#166534', bg: '#dcfce7' };
-  if (u.includes('clinicaltrials')) return { label: 'Trials', color: '#9a3412', bg: '#ffedd5' };
-  if (u.includes('reporter.nih')) return { label: 'NIH', color: '#5b21b6', bg: '#ede9fe' };
-  if (u.includes('unc.edu')) return { label: 'UNC', color: '#0e7490', bg: '#cffafe' };
-  return { label: 'Web', color: '#374151', bg: '#f3f4f6' };
+  const safe = url || '';
+  if (u.includes('sec.gov/archives/edgar') || u.includes('sec.gov/cgi-bin/browse-edgar')) {
+    return `US Securities and Exchange Commission. EDGAR filing. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('sec.gov')) {
+    return `US Securities and Exchange Commission. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('pubmed.ncbi.nlm.nih.gov')) {
+    const m = u.match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)/);
+    const pmid = m ? m[1] : '';
+    return `PubMed${pmid ? ` ID: ${pmid}` : ''}. National Library of Medicine. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('clinicaltrials.gov')) {
+    const m = u.match(/clinicaltrials\.gov\/study\/(nct\d+)/i);
+    const nct = m ? m[1].toUpperCase() : '';
+    return `ClinicalTrials.gov${nct ? ` identifier: ${nct}` : ''}. US National Library of Medicine. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('reporter.nih.gov')) {
+    const m = u.match(/project-details\/([^/?#]+)/);
+    const proj = m ? m[1] : '';
+    return `${proj ? `Project ${proj}. ` : ''}NIH RePORTER. National Institutes of Health. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('research.unc.edu')) {
+    return `Office of the Vice Chancellor for Research. University of North Carolina at Chapel Hill. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('unclineberger.org')) {
+    return `UNC Lineberger Comprehensive Cancer Center. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('sph.unc.edu')) {
+    return `UNC Gillings School of Global Public Health. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('pharmacy.unc.edu')) {
+    return `UNC Eshelman School of Pharmacy. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('med.unc.edu')) {
+    return `UNC School of Medicine. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('tracs.unc.edu')) {
+    return `NC TraCS Institute. University of North Carolina at Chapel Hill. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('shepscenter.unc.edu')) {
+    return `Cecil G. Sheps Center for Health Services Research. University of North Carolina at Chapel Hill. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('ncahec.net')) {
+    return `North Carolina Area Health Education Centers. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('unc.edu')) {
+    return `University of North Carolina at Chapel Hill. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('cancer.gov')) {
+    return `National Cancer Institute. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('nih.gov')) {
+    return `National Institutes of Health. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('fda.gov')) {
+    return `US Food and Drug Administration. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('hrsa.gov')) {
+    return `Health Resources and Services Administration. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('cdc.gov')) {
+    return `Centers for Disease Control and Prevention. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('energy.gov')) {
+    return `US Department of Energy. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('nist.gov')) {
+    return `National Institute of Standards and Technology. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('quantum.gov')) {
+    return `National Quantum Initiative. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('ncbiotech.org')) {
+    return `North Carolina Biotechnology Center. Accessed ${TODAY}. ${safe}`;
+  }
+  if (u.includes('rtp.org')) {
+    return `Research Triangle Foundation of North Carolina. Accessed ${TODAY}. ${safe}`;
+  }
+  // Generic: extract host
+  let host = '';
+  try { host = new URL(safe).host.replace(/^www\./, ''); } catch { host = safe; }
+  return `${host}. Accessed ${TODAY}. ${safe}`;
 }
 
-function SourcePill({ url }: { url: string }) {
-  const m = sourceMeta(url);
+// Walk the normalized report tree and collect every URL in first-appearance order.
+function collectUrls(node: any, out: string[], seen: Set<string>) {
+  if (node && typeof node === 'object') {
+    if (Array.isArray(node.sources)) {
+      for (const u of node.sources) {
+        if (typeof u === 'string' && u && !seen.has(u)) {
+          seen.add(u); out.push(u);
+        }
+      }
+    }
+    if (typeof node.source === 'string' && node.source && !seen.has(node.source)) {
+      seen.add(node.source); out.push(node.source);
+    }
+    if (typeof node.url === 'string' && node.url && !seen.has(node.url)) {
+      seen.add(node.url); out.push(node.url);
+    }
+    for (const k of Object.keys(node)) collectUrls((node as any)[k], out, seen);
+  }
+}
+
+function buildCitationIndex(data: any): CitationIndex {
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+  collectUrls(data, ordered, seen);
+  const numbers = new Map<string, number>();
+  ordered.forEach((u, i) => numbers.set(u, i + 1));
+  const list = ordered.map((url, i) => ({
+    id: i + 1, url, ama: amaFormat(url),
+  }));
+  return {
+    numberOf: (u: string) => numbers.get(u) || 0,
+    list,
+  };
+}
+
+const CitationCtx = React.createContext<CitationIndex>({
+  numberOf: () => 0,
+  list: [],
+});
+
+// In-text superscript citation, AMA style: ¹ or ²,³ for multiple.
+function Cite({ urls }: { urls: string[] }) {
+  const idx = React.useContext(CitationCtx);
+  if (!urls || urls.length === 0) return null;
+  const nums = urls.map((u) => idx.numberOf(u)).filter((n) => n > 0);
+  if (nums.length === 0) return null;
+  // AMA: comma-separate non-consecutive; en-dash for runs of 3+. Keep simple here.
+  const display = nums.join(',');
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: '0.04em',
-        padding: '2px 8px',
-        borderRadius: 999,
-        color: m.color,
-        background: m.bg,
-        textDecoration: 'none',
-        marginRight: 4,
-      }}
-    >
-      {m.label}
-    </a>
+    <sup style={styles.cite} title={urls.join('\n')}>
+      <a href={`#ref-${nums[0]}`} style={styles.citeLink}>{display}</a>
+    </sup>
   );
 }
 
-function Sources({ urls }: { urls: string[] }) {
-  if (!urls || urls.length === 0) return null;
-  const verified = urls.length >= 2;
+// One pill for a standalone URL where a number is overkill (e.g. SEC filings grid).
+function SourceLink({ url }: { url: string }) {
+  const idx = React.useContext(CitationCtx);
+  const n = idx.numberOf(url);
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6 }}>
-      {urls.map((u, i) => (
-        <SourcePill key={i} url={u} />
-      ))}
-      <span
-        style={{
-          fontSize: 10,
-          fontWeight: 600,
-          padding: '2px 6px',
-          borderRadius: 999,
-          color: verified ? '#15803d' : '#b91c1c',
-          background: verified ? '#dcfce7' : '#fee2e2',
-        }}
-        title={verified ? 'Two sources verified' : 'Needs second source'}
-      >
-        {verified ? '✓' : '!'}
-      </span>
-    </span>
+    <a href={url} target="_blank" rel="noreferrer" style={styles.sourceLink}>
+      {n > 0 ? <sup style={styles.cite}>{n}</sup> : null}
+    </a>
   );
 }
 
@@ -143,7 +244,7 @@ function Claim({ text, sources }: Sourced) {
   return (
     <p style={styles.claim}>
       {text}
-      <Sources urls={sources || []} />
+      <Cite urls={sources || []} />
     </p>
   );
 }
@@ -259,8 +360,10 @@ export default function Report({ data: rawData }: { data: any }) {
   const data = normalize(rawData);
   const m = data.report_meta;
   const v = data._validation;
+  const citations = React.useMemo(() => buildCitationIndex(data), [data]);
 
   return (
+    <CitationCtx.Provider value={citations}>
     <article style={styles.article}>
       {/* HEADER */}
       <header style={styles.header}>
@@ -302,7 +405,7 @@ export default function Report({ data: rawData }: { data: any }) {
             {data.section1_overview.why_now.map((s, i) => (
               <li key={i} style={styles.li}>
                 {s.signal}
-                <Sources urls={s.sources} />
+                <Cite urls={s.sources} />
               </li>
             ))}
           </ul>
@@ -318,7 +421,7 @@ export default function Report({ data: rawData }: { data: any }) {
             rows={data.section1_overview.unc_units.map((u) => [
               <strong key="u">{u.unit}</strong>,
               u.focus,
-              <SourcePill key="s" url={u.url} />,
+              <SourceLink url={u.url} />,
             ])}
           />
         ) : <Empty label="No UNC units identified." />}
@@ -331,10 +434,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>2.1 Known UNC Partnerships in This Sector</H3>
         {data.section2_internal_mapping.known_partnerships?.length ? (
           <Table
-            headers={['Company', 'UNC Unit', 'Type', 'Active?', 'Sources']}
+            headers={['Company', 'UNC Unit', 'Type', 'Active?', 'Ref.']}
             rows={data.section2_internal_mapping.known_partnerships.map((p) => [
               p.company, p.unc_unit, p.relationship_type, p.active,
-              <Sources key="s" urls={p.sources} />,
+              <Cite key="s" urls={p.sources} />,
             ])}
           />
         ) : <Empty label="None identified." />}
@@ -342,10 +445,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>2.2 UNC Faculty with Verified Sector Expertise</H3>
         {data.section2_internal_mapping.unc_faculty?.length ? (
           <Table
-            headers={['Faculty', 'School', 'Research Focus', 'Sources']}
+            headers={['Faculty', 'School', 'Research Focus', 'Ref.']}
             rows={data.section2_internal_mapping.unc_faculty.map((f) => [
               <strong key="n">{f.name}</strong>, f.school, f.research_focus,
-              <Sources key="s" urls={f.sources} />,
+              <Cite key="s" urls={f.sources} />,
             ])}
           />
         ) : <Empty label="None identified." />}
@@ -353,10 +456,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>2.3 UNC Data Assets Relevant to This Sector</H3>
         {data.section2_internal_mapping.data_assets?.length ? (
           <Table
-            headers={['Dataset', 'Description', 'Held By', 'Sources']}
+            headers={['Dataset', 'Description', 'Held By', 'Ref.']}
             rows={data.section2_internal_mapping.data_assets.map((d) => [
               <strong key="n">{d.name}</strong>, d.description, d.held_by,
-              <Sources key="s" urls={d.sources} />,
+              <Cite key="s" urls={d.sources} />,
             ])}
           />
         ) : <Empty label="None identified." />}
@@ -364,10 +467,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>2.4 Relationship Risk Flags</H3>
         {data.section2_internal_mapping.risk_flags?.length ? (
           <Table
-            headers={['Company', 'Risk', 'Sources']}
+            headers={['Company', 'Risk', 'Ref.']}
             rows={data.section2_internal_mapping.risk_flags.map((r) => [
               <strong key="n">{r.company}</strong>, r.risk,
-              <Sources key="s" urls={r.sources} />,
+              <Cite key="s" urls={r.sources} />,
             ])}
           />
         ) : <Empty label="No risks flagged." />}
@@ -380,10 +483,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>3.2 Companies Selected</H3>
         {data.section3_selection.selected?.length ? (
           <Table
-            headers={['Company', 'UNC Alignment', 'Existing Tie', 'Sources']}
+            headers={['Company', 'UNC Alignment', 'Existing Tie', 'Ref.']}
             rows={data.section3_selection.selected.map((s) => [
               <strong key="n">{s.company}</strong>, s.unc_alignment, s.existing_tie,
-              <Sources key="s" urls={s.sources} />,
+              <Cite key="s" urls={s.sources} />,
             ])}
           />
         ) : <Empty label="No selections recorded." />}
@@ -391,9 +494,9 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>3.3 Companies Reviewed and Excluded</H3>
         {data.section3_selection.excluded?.length ? (
           <Table
-            headers={['Company', 'Reason', 'Sources']}
+            headers={['Company', 'Reason', 'Ref.']}
             rows={data.section3_selection.excluded.map((s) => [
-              s.company, s.reason, <Sources key="s" urls={s.sources} />,
+              s.company, s.reason, <Cite key="s" urls={s.sources} />,
             ])}
           />
         ) : <Empty label="No exclusions recorded." />}
@@ -428,7 +531,7 @@ export default function Report({ data: rawData }: { data: any }) {
               rows={Object.entries(p.facts || {}).map(([k, v]) => [
                 <span key="k" style={styles.factKey}>{k.replace(/_/g, ' ')}</span>,
                 v.value,
-                <SourcePill key="s" url={v.source} />,
+                <SourceLink url={v.source} />,
               ])}
             />
 
@@ -459,11 +562,11 @@ export default function Report({ data: rawData }: { data: any }) {
             <H3>Pipeline and Platform</H3>
             {p.pipeline?.length ? (
               <Table
-                headers={['Program', 'Indication', 'Stage', 'Sources']}
+                headers={['Program', 'Indication', 'Stage', 'Ref.']}
                 rows={p.pipeline.map((r) => [
                   <strong key="n">{r.program}</strong>, r.indication,
                   <span key="s" style={styles.stagePill}>{r.stage}</span>,
-                  <Sources key="src" urls={r.sources} />,
+                  <Cite urls={r.sources} />,
                 ])}
               />
             ) : <Empty label="No pipeline programs documented." />}
@@ -471,10 +574,10 @@ export default function Report({ data: rawData }: { data: any }) {
             <H3>External Partnering History</H3>
             {p.partnering_history?.length ? (
               <Table
-                headers={['Partner', 'Deal Type', 'Year', 'Sources']}
+                headers={['Partner', 'Deal Type', 'Year', 'Ref.']}
                 rows={p.partnering_history.map((r) => [
                   r.partner, r.deal_type, r.year,
-                  <Sources key="s" urls={r.sources} />,
+                  <Cite key="s" urls={r.sources} />,
                 ])}
               />
             ) : <Empty label="No documented external partnerships." />}
@@ -491,7 +594,7 @@ export default function Report({ data: rawData }: { data: any }) {
                     </div>
                     <p style={styles.alignFact}><strong>Company:</strong> {a.company_fact}</p>
                     <p style={styles.alignFact}><strong>UNC:</strong> {a.unc_fact}</p>
-                    <p style={styles.alignFact}><strong>Why it matters:</strong> {a.rationale}<Sources urls={a.sources} /></p>
+                    <p style={styles.alignFact}><strong>Why it matters:</strong> {a.rationale}<Cite urls={a.sources} /></p>
                   </div>
                 ))}
               </div>
@@ -500,10 +603,10 @@ export default function Report({ data: rawData }: { data: any }) {
             <H3>What UNC Can Offer</H3>
             {p.what_unc_offers?.length ? (
               <Table
-                headers={['Offering', 'Description', 'Sources']}
+                headers={['Offering', 'Description', 'Ref.']}
                 rows={p.what_unc_offers.map((r) => [
                   <strong key="n">{r.offering}</strong>, r.description,
-                  <Sources key="s" urls={r.sources} />,
+                  <Cite key="s" urls={r.sources} />,
                 ])}
               />
             ) : <Empty label="None documented." />}
@@ -513,7 +616,7 @@ export default function Report({ data: rawData }: { data: any }) {
               <ul style={styles.list}>
                 {p.signals.map((s, j) => (
                   <li key={j} style={styles.li}>
-                    {s.signal}<Sources urls={s.sources} />
+                    {s.signal}<Cite urls={s.sources} />
                   </li>
                 ))}
               </ul>
@@ -529,10 +632,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>5.1 UNC Data Assets</H3>
         {data.section5_value_prop.data_assets?.length ? (
           <Table
-            headers={['Dataset', 'Description', 'Relevance', 'Sources']}
+            headers={['Dataset', 'Description', 'Relevance', 'Ref.']}
             rows={data.section5_value_prop.data_assets.map((d) => [
               <strong key="n">{d.name}</strong>, d.description, d.relevance,
-              <Sources key="s" urls={d.sources} />,
+              <Cite key="s" urls={d.sources} />,
             ])}
           />
         ) : <Empty label="None documented." />}
@@ -540,10 +643,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>5.2 UNC Research Capacity</H3>
         {data.section5_value_prop.research_capacity?.length ? (
           <Table
-            headers={['Name', 'Role', 'Expertise', 'Sources']}
+            headers={['Name', 'Role', 'Expertise', 'Ref.']}
             rows={data.section5_value_prop.research_capacity.map((d) => [
               <strong key="n">{d.name}</strong>, d.role, d.expertise,
-              <Sources key="s" urls={d.sources} />,
+              <Cite key="s" urls={d.sources} />,
             ])}
           />
         ) : <Empty label="None documented." />}
@@ -551,10 +654,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>5.3 Talent Pipeline</H3>
         {data.section5_value_prop.talent_pipeline?.length ? (
           <Table
-            headers={['Program', 'School', 'Output', 'Sources']}
+            headers={['Program', 'School', 'Output', 'Ref.']}
             rows={data.section5_value_prop.talent_pipeline.map((d) => [
               <strong key="n">{d.program}</strong>, d.school, d.output,
-              <Sources key="s" urls={d.sources} />,
+              <Cite key="s" urls={d.sources} />,
             ])}
           />
         ) : <Empty label="None documented." />}
@@ -562,10 +665,10 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>5.4 NC Access and Infrastructure</H3>
         {data.section5_value_prop.nc_access?.length ? (
           <Table
-            headers={['Asset', 'Description', 'Sources']}
+            headers={['Asset', 'Description', 'Ref.']}
             rows={data.section5_value_prop.nc_access.map((d) => [
               <strong key="n">{d.asset}</strong>, d.description,
-              <Sources key="s" urls={d.sources} />,
+              <Cite key="s" urls={d.sources} />,
             ])}
           />
         ) : <Empty label="None documented." />}
@@ -624,23 +727,25 @@ export default function Report({ data: rawData }: { data: any }) {
         </ul>
       </section>
 
-      {/* REFERENCES */}
-      {data.references?.length ? (
+      {/* REFERENCES — AMA */}
+      {citations.list.length > 0 && (
         <section style={styles.section}>
           <H2 n={8} title="References" />
+          <p style={styles.refNote}>Citations follow AMA Manual of Style (11th ed.).</p>
           <ol style={styles.refList}>
-            {data.references.map((r) => (
-              <li key={r.id} style={styles.refItem}>
+            {citations.list.map((r) => (
+              <li key={r.id} id={`ref-${r.id}`} style={styles.refItem}>
+                {r.ama.replace(r.url, '')}
                 <a href={r.url} target="_blank" rel="noreferrer" style={styles.refLink}>
-                  {r.title}
+                  {r.url}
                 </a>
-                {' — '}{r.publisher}, {r.year}
               </li>
             ))}
           </ol>
         </section>
-      ) : null}
+      )}
     </article>
+    </CitationCtx.Provider>
   );
 }
 
@@ -889,5 +994,16 @@ const styles: Record<string, CSSProperties> = {
   },
   refList: { paddingLeft: 24, color: '#374151', fontSize: 13, lineHeight: 1.7 },
   refItem: { marginBottom: 6 },
-  refLink: { color: '#0a0a0a', textDecoration: 'underline' },
+  refLink: { color: '#0a0a0a', textDecoration: 'underline', wordBreak: 'break-all' },
+  refNote: { fontSize: 12, color: '#999', marginBottom: 12, fontStyle: 'italic' },
+  cite: {
+    fontSize: 10,
+    color: '#1e40af',
+    fontWeight: 600,
+    marginLeft: 2,
+    verticalAlign: 'super',
+    lineHeight: 1,
+  },
+  citeLink: { color: 'inherit', textDecoration: 'none' },
+  sourceLink: { color: '#1e40af', textDecoration: 'none' },
 };

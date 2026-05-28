@@ -218,47 +218,45 @@ class ReportBuilder:
         assets = xbrl.get("total_assets") or {}
         emp = xbrl.get("employees") or {}
 
-        overview_text = (
-            f"{facts.get('legal_name', c['name'])} is an SEC-registered "
-            f"{facts.get('entity_type', 'entity').lower() or 'entity'} "
-            f"(SIC: {facts.get('sic', 'n/a')}, CIK: {facts.get('cik', 'n/a')})"
-        )
+        # Concise factual overview — no filler.
+        parts = [facts.get("legal_name", c["name"]).rstrip(".") + "."]
+        if facts.get("sic"):
+            parts.append(f"{facts['sic']}.")
         if facts.get("hq"):
-            overview_text += f" headquartered in {facts['hq']}"
+            parts.append(f"HQ: {_fmt_hq(facts['hq'])}.")
         if rev.get("value"):
-            overview_text += (f". FY{rev.get('fy')} revenue was "
-                              f"{_fmt_usd(rev['value'])} per its most recent 10-K")
+            parts.append(f"FY{rev.get('fy')} revenue: {_fmt_usd(rev['value'])}.")
         if rd.get("value"):
-            overview_text += f"; R&D expense {_fmt_usd(rd['value'])}"
-        overview_text += (
-            f". The company has filed {len(recent_filings)} recent SEC documents and "
-            f"sponsors {len(trials)} clinical trials indexed on ClinicalTrials.gov."
-        )
+            parts.append(f"R&D: {_fmt_usd(rd['value'])}.")
+        parts.append(f"{len(trials)} active trials.")
+        overview_text = " ".join(parts)
 
         pipeline = []
         for t in trials[:8]:
+            title = (t.get("title") or "").strip()
             pipeline.append({
-                "program": t.get("title", "Trial")[:160],
-                "indication": t.get("title", "")[:160],
-                "stage": t.get("phase", "n/a") or "n/a",
+                "program": title[:120] or "Trial",
+                "indication": "",  # title already conveys indication; keep table tight
+                "stage": (t.get("phase") or "—").replace("PHASE", "Phase").strip() or "—",
                 "sources": [t.get("url", "https://clinicaltrials.gov"), edgar_url],
             })
 
-        # Recent signals — 8-K filings from last 24 months
+        # Recent signals — 8-K filings (material events disclosed under SEC rules)
         signals = []
         for f in recent_filings:
             if f.get("form") == "8-K" and len(signals) < 5:
+                date = f.get("date", "")
                 signals.append({
-                    "signal": f"Filed 8-K on {f.get('date', '')} (material event disclosure)",
+                    "signal": f"8-K filed {date}.",
                     "sources": [f.get("url", edgar_url), edgar_url],
                 })
 
-        # Partnering history — best effort from 10-K / S-1 filing dates
+        # Partnering history — analyst extracts from 10-K Item 1 / S-1
         partnering = []
         for f in recent_filings:
-            if f.get("form") in ("10-K", "10-Q", "S-1") and len(partnering) < 3:
+            if f.get("form") in ("10-K", "S-1") and len(partnering) < 2:
                 partnering.append({
-                    "partner": "[REQUIRES ANALYST — extract from filing]",
+                    "partner": "[Analyst — extract from filing]",
                     "deal_type": f.get("form"),
                     "year": (f.get("date", "") or "")[:4],
                     "sources": [f.get("url", edgar_url), edgar_url],
@@ -296,44 +294,7 @@ class ReportBuilder:
                          "sources": [edgar_url, _first_trial_url(c)]},
             "partnership_type": "Strategic" if len(trials) > 5 else "Translational",
             "existing_unc_tie": bool(papers),
-            "facts": {
-                "legal_name": {"value": facts.get("legal_name", c["name"]), "source": edgar_url},
-                "cik": {"value": facts.get("cik", "n/a") or "n/a", "source": edgar_url},
-                "hq": {"value": facts.get("hq", "n/a") or "n/a", "source": edgar_url},
-                "type": {"value": facts.get("entity_type", "n/a") or "n/a", "source": edgar_url},
-                "ticker_exchange": {
-                    "value": f"{ticker} ({exchange})" if exchange else ticker,
-                    "source": edgar_url,
-                },
-                "sic": {"value": facts.get("sic", "n/a") or "n/a", "source": edgar_url},
-                "fiscal_year_end": {"value": facts.get("fiscal_year_end") or "n/a",
-                                    "source": edgar_url},
-                "revenue_latest_10k": {
-                    "value": (f"{_fmt_usd(rev['value'])} (FY{rev.get('fy')})"
-                              if rev.get("value") else "n/a"),
-                    "source": rev.get("url", edgar_url),
-                },
-                "rd_expense_latest_10k": {
-                    "value": (f"{_fmt_usd(rd['value'])} (FY{rd.get('fy')})"
-                              if rd.get("value") else "n/a"),
-                    "source": rd.get("url", edgar_url),
-                },
-                "net_income_latest_10k": {
-                    "value": (f"{_fmt_usd(net['value'])} (FY{net.get('fy')})"
-                              if net.get("value") else "n/a"),
-                    "source": net.get("url", edgar_url),
-                },
-                "total_assets_latest_10k": {
-                    "value": (f"{_fmt_usd(assets['value'])} (FY{assets.get('fy')})"
-                              if assets.get("value") else "n/a"),
-                    "source": assets.get("url", edgar_url),
-                },
-                "employees": {
-                    "value": (f"{int(emp['value']):,} (FY{emp.get('fy')})"
-                              if emp.get("value") else "n/a"),
-                    "source": emp.get("url", edgar_url),
-                },
-            },
+            "facts": _facts_table(facts, ticker, exchange, rev, rd, net, assets, emp, edgar_url),
             "sec_filings": {
                 "10-K (Annual Report)": filings_by_form.get("10-K", []),
                 "10-Q (Quarterly Report)": filings_by_form.get("10-Q", []),
@@ -442,6 +403,46 @@ class ReportBuilder:
                     g.get("url", ""), "NIH Reporter",
                     str(g.get("fiscal_year", "")))
         return refs[:30]
+
+
+def _facts_table(facts, ticker, exchange, rev, rd, net, assets, emp, edgar_url) -> dict:
+    """Build the per-company facts table, dropping any row with no value."""
+    rows = {}
+
+    def add(key: str, value, source: str):
+        if value not in (None, "", "n/a"):
+            rows[key] = {"value": value, "source": source or edgar_url}
+
+    add("legal_name", facts.get("legal_name"), edgar_url)
+    add("cik", facts.get("cik"), edgar_url)
+    add("ticker", f"{ticker} ({exchange})" if exchange else ticker, edgar_url)
+    add("hq", _fmt_hq(facts.get("hq") or ""), edgar_url)
+    add("sic", facts.get("sic"), edgar_url)
+    add("fy_end", facts.get("fiscal_year_end"), edgar_url)
+    if rev.get("value"):
+        add("revenue", f"{_fmt_usd(rev['value'])} (FY{rev.get('fy')})",
+            rev.get("url", edgar_url))
+    if rd.get("value"):
+        add("rd_expense", f"{_fmt_usd(rd['value'])} (FY{rd.get('fy')})",
+            rd.get("url", edgar_url))
+    if net.get("value"):
+        add("net_income", f"{_fmt_usd(net['value'])} (FY{net.get('fy')})",
+            net.get("url", edgar_url))
+    if assets.get("value"):
+        add("total_assets", f"{_fmt_usd(assets['value'])} (FY{assets.get('fy')})",
+            assets.get("url", edgar_url))
+    if emp.get("value"):
+        add("employees", f"{int(emp['value']):,} (FY{emp.get('fy')})",
+            emp.get("url", edgar_url))
+    return rows
+
+
+def _fmt_hq(hq: str) -> str:
+    """'RAHWAY, NJ' -> 'Rahway, NJ'. Title-case city, keep state code upper."""
+    parts = [p.strip() for p in hq.split(",")]
+    if len(parts) >= 2:
+        return f"{parts[0].title()}, {parts[1].upper()}"
+    return hq.title()
 
 
 def _fmt_usd(val) -> str:
