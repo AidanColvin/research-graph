@@ -1,4 +1,52 @@
-node_modules
-.vercel
-.env*
+# ───────────────────────────── Dependencies ─────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.venv/
+venv/
+env/
+
+# ───────────────────────────── Build output ─────────────────────────────
 .next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ─────────────────────────── Python artifacts ───────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+
+# ──────────────────────────── Test / coverage ───────────────────────────
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+test-results/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ───────────────────────────── Environment ──────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ──────────────────────────── Tooling / IDE ─────────────────────────────
+.vercel
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# ─────────── Stale root-level duplicate (real apps live in ───────────────
+# ─────────── aria-pi-frontend/ and aria-pi-backend/) ─────────────────────
+/src/
+/aria_pi/
+/package.json
+/package-lock.json
+/tsconfig.json
