@@ -93,7 +93,8 @@ class ReportBuilder:
             return v if isinstance(v, str) and v.strip() and not v.startswith("[REQUIRES") else fallback
 
         # SIC codes give us a credible definition. Names give us scale.
-        sics = sorted({(c.get("facts", {}) or {}).get("sic", "") for c in companies if (c.get("facts", {}) or {}).get("sic")})
+        sics = sorted({str(s) for c in companies
+                       for s in [(c.get("facts", {}) or {}).get("sic")] if s})
         names = [c["name"] for c in companies]
         total_rev = sum(((c.get("facts", {}) or {}).get("xbrl", {}) or {}).get("revenue", {}).get("value") or 0
                         for c in companies)
@@ -336,8 +337,8 @@ class ReportBuilder:
         filings_by_form = facts.get("filings_by_form") or {}
         xbrl = facts.get("xbrl") or {}
 
-        ticker = ",".join(facts.get("tickers", []) or []) or "n/a"
-        exchange = ",".join(facts.get("exchanges", []) or []) or ""
+        ticker = ",".join(str(t) for t in (facts.get("tickers") or []) if t) or "n/a"
+        exchange = ",".join(str(e) for e in (facts.get("exchanges") or []) if e) or ""
 
         rev = xbrl.get("revenue") or {}
         rd = xbrl.get("rd_expense") or {}
@@ -436,7 +437,7 @@ class ReportBuilder:
                 "unc_unit": "UNC Chapel Hill (per PubMed)",
                 "company_fact": f"{c['name']} research disclosed in: {p.get('title', '')[:120]}",
                 "unc_fact": (f"UNC co-authors: "
-                             f"{', '.join((p.get('authors') or [])[:3])}"),
+                             f"{', '.join(a for a in (p.get('authors') or [])[:3] if a)}"),
                 "rationale": (f"UNC and {c['name']} are publicly tied through a "
                               f"co-authored publication ({p.get('year', '')}) — "
                               "the strongest baseline for outreach."),

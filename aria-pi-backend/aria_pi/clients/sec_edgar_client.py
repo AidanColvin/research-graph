@@ -89,7 +89,7 @@ class SECEdgarClient:
         return {
             "legal_name": data.get("name", company_name),
             "cik": cik,
-            "sic": data.get("sicDescription", "") or data.get("sic", ""),
+            "sic": str(data.get("sicDescription") or data.get("sic") or ""),
             "tickers": data.get("tickers", []) or [],
             "exchanges": data.get("exchanges", []) or [],
             "hq": hq,
