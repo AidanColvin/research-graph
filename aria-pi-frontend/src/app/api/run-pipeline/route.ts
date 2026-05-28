@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Live FastAPI backend (Vercel project "aria-pi-api"). Override per-env with
-// API_URL. Falls back to the stable production alias of the backend project.
+// API_URL. Falls back to the clean public production alias — this domain is
+// NOT behind Deployment Protection, so the proxy reaches it without a token.
 const BACKEND_URL =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://aria-pi-api-aidancolvins-projects.vercel.app';
+  'https://aria-pi-api.vercel.app';
 
 // If the backend project keeps Vercel Deployment Protection ON, set this env
 // to the project's protection-bypass token so the server-side proxy can reach
