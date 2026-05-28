@@ -174,13 +174,27 @@ _EXACT_ALIASES = {
 }
 
 
+# Generic catch-all sectors. A bare single word ("food", "tech", "energy")
+# may map here, but a qualified multi-word term ("pet food", "solar panels",
+# "electric vehicle") is too specific to force into a broad bucket — those
+# fall through to live SEC discovery, which surfaces the actual niche players
+# (Freshpet, First Solar, Rivian) instead of generic megacaps.
+_BROAD_TARGETS = {
+    "consumer", "retail", "technology", "industrial",
+    "energy", "automotive", "climate tech", "software",
+}
+
+
 def canonical_sector(sector: str) -> Optional[str]:
     """Resolve a raw sector string to a canonical SECTOR_SEEDS key, or None.
 
     Order matters: exact key, then whole-string abbreviations, then keyword
     routes, then (length-guarded) loose containment, then fuzzy skeleton match.
-    The length guard prevents tiny tokens like "ai" from matching by accident
-    inside longer sector names ("retAIl").
+
+    Returning None is a feature, not a failure: it signals the orchestrator to
+    research the term live via SEC EDGAR full-text discovery. So we deliberately
+    decline to match a niche, qualified term (e.g. "pet food", "solar panels")
+    to a broad curated bucket — discovery yields a far more relevant company set.
     """
     key = (sector or "").lower().strip()
     if not key:
@@ -189,16 +203,34 @@ def canonical_sector(sector: str) -> Optional[str]:
         return key
     if key in _EXACT_ALIASES:
         return _EXACT_ALIASES[key]
+
+    single_token = " " not in key
     for needles, target in _KEYWORD_ROUTES:
-        if any(n.strip() in key for n in needles):
+        broad = target in _BROAD_TARGETS
+        for n in needles:
+            nn = n.strip()
+            if nn not in key:
+                continue
+            # Broad catch-alls only fire on a bare single-word input; a
+            # multi-word qualifier ("pet food") should be researched live.
+            # Specific sectors (insurance, oncology, pharma…) still match on
+            # substring, so "car insurance" → insurance is preserved.
+            if broad and not single_token:
+                continue
             return target
-    if len(key) >= 4:
+
+    # Loose containment — single-token inputs only, and never into a broad
+    # bucket, so niche multi-word terms keep falling through to discovery.
+    if single_token and len(key) >= 4:
         for known in SECTOR_SEEDS:
+            if known in _BROAD_TARGETS:
+                continue
             if known in key or key in known:
                 return known
+
     # Fuzzy: tolerate misspellings by comparing consonant skeletons.
     skel = _collapse(key)
-    if len(skel) >= 3:
+    if len(skel) >= 3 and single_token:
         for token, target in _FUZZY_ROUTES:
             if _collapse(token) in skel:
                 return target
