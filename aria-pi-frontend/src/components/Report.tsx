@@ -30,6 +30,7 @@ export type ReportData = {
     partnership_type: string;
     existing_unc_tie: boolean;
     facts: Record<string, { value: string; source: string }>;
+    sec_filings?: Record<string, { form: string; date: string; url: string }[]>;
     pipeline: { program: string; indication: string; stage: string; sources: SourceList }[];
     partnering_history: { partner: string; deal_type: string; year: string; sources: SourceList }[];
     unc_alignment: { company_program: string; unc_unit: string; company_fact: string; unc_fact: string; rationale: string; sources: SourceList }[];
@@ -220,6 +221,7 @@ function normalize(raw: any): ReportData {
       partnership_type: p?.partnership_type || 'Unknown',
       existing_unc_tie: !!p?.existing_unc_tie,
       facts: p?.facts || {},
+      sec_filings: (p?.sec_filings && typeof p.sec_filings === 'object') ? p.sec_filings : undefined,
       pipeline: Array.isArray(p?.pipeline) ? p.pipeline : [],
       partnering_history: Array.isArray(p?.partnering_history) ? p.partnering_history : [],
       unc_alignment: Array.isArray(p?.unc_alignment) ? p.unc_alignment : [],
@@ -420,7 +422,7 @@ export default function Report({ data: rawData }: { data: any }) {
 
             <Claim {...p.overview} />
 
-            <H3>Company Facts</H3>
+            <H3>Company Facts (SEC EDGAR + XBRL)</H3>
             <Table
               headers={['Field', 'Value', 'Source']}
               rows={Object.entries(p.facts || {}).map(([k, v]) => [
@@ -429,6 +431,30 @@ export default function Report({ data: rawData }: { data: any }) {
                 <SourcePill key="s" url={v.source} />,
               ])}
             />
+
+            {p.sec_filings && (
+              <>
+                <H3>Recent SEC Filings</H3>
+                <div style={styles.filingsWrap}>
+                  {Object.entries(p.sec_filings)
+                    .filter(([, list]) => Array.isArray(list) && list.length > 0)
+                    .map(([formLabel, list]) => (
+                      <div key={formLabel} style={styles.filingsGroup}>
+                        <div style={styles.filingsForm}>{formLabel}</div>
+                        <ul style={styles.filingsList}>
+                          {list.map((f, i) => (
+                            <li key={i} style={styles.filingsItem}>
+                              <a href={f.url} target="_blank" rel="noreferrer" style={styles.filingsLink}>
+                                {f.date || 'undated'}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                </div>
+              </>
+            )}
 
             <H3>Pipeline and Platform</H3>
             {p.pipeline?.length ? (
@@ -766,6 +792,29 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 999,
   },
   factKey: { color: '#666', textTransform: 'capitalize', fontSize: 12 },
+  filingsWrap: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gap: 12,
+    marginTop: 4,
+  },
+  filingsGroup: {
+    border: '1px solid #eee',
+    borderRadius: 10,
+    padding: 12,
+    background: '#fafafa',
+  },
+  filingsForm: {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    color: '#1e40af',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  filingsList: { listStyle: 'none', padding: 0, margin: 0 },
+  filingsItem: { fontSize: 12, padding: '2px 0', color: '#374151' },
+  filingsLink: { color: '#1e40af', textDecoration: 'none' },
   stagePill: {
     fontSize: 11,
     fontWeight: 600,

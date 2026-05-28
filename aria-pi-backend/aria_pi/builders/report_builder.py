@@ -206,16 +206,30 @@ class ReportBuilder:
         trials = c.get("trials", []) or []
         papers = c.get("pubmed") or []
         recent_filings = facts.get("recent_filings", []) or []
+        filings_by_form = facts.get("filings_by_form") or {}
+        xbrl = facts.get("xbrl") or {}
 
         ticker = ",".join(facts.get("tickers", []) or []) or "n/a"
         exchange = ",".join(facts.get("exchanges", []) or []) or ""
 
+        rev = xbrl.get("revenue") or {}
+        rd = xbrl.get("rd_expense") or {}
+        net = xbrl.get("net_income") or {}
+        assets = xbrl.get("total_assets") or {}
+        emp = xbrl.get("employees") or {}
+
         overview_text = (
-            f"{facts.get('legal_name', c['name'])} is registered with the SEC "
-            f"({facts.get('entity_type', 'entity')}, SIC: {facts.get('sic', 'n/a')})"
+            f"{facts.get('legal_name', c['name'])} is an SEC-registered "
+            f"{facts.get('entity_type', 'entity').lower() or 'entity'} "
+            f"(SIC: {facts.get('sic', 'n/a')}, CIK: {facts.get('cik', 'n/a')})"
         )
         if facts.get("hq"):
             overview_text += f" headquartered in {facts['hq']}"
+        if rev.get("value"):
+            overview_text += (f". FY{rev.get('fy')} revenue was "
+                              f"{_fmt_usd(rev['value'])} per its most recent 10-K")
+        if rd.get("value"):
+            overview_text += f"; R&D expense {_fmt_usd(rd['value'])}"
         overview_text += (
             f". The company has filed {len(recent_filings)} recent SEC documents and "
             f"sponsors {len(trials)} clinical trials indexed on ClinicalTrials.gov."
@@ -284,15 +298,48 @@ class ReportBuilder:
             "existing_unc_tie": bool(papers),
             "facts": {
                 "legal_name": {"value": facts.get("legal_name", c["name"]), "source": edgar_url},
+                "cik": {"value": facts.get("cik", "n/a") or "n/a", "source": edgar_url},
                 "hq": {"value": facts.get("hq", "n/a") or "n/a", "source": edgar_url},
-                "website": {"value": facts.get("website") or edgar_url, "source": edgar_url},
                 "type": {"value": facts.get("entity_type", "n/a") or "n/a", "source": edgar_url},
-                "ticker_parent": {"value": f"{ticker} ({exchange})" if exchange else ticker,
-                                  "source": edgar_url},
-                "employees": {"value": "[see 10-K]", "source": edgar_url},
-                "founded": {"value": "[see 10-K]", "source": edgar_url},
-                "revenue": {"value": "[see 10-K]", "source": edgar_url},
+                "ticker_exchange": {
+                    "value": f"{ticker} ({exchange})" if exchange else ticker,
+                    "source": edgar_url,
+                },
                 "sic": {"value": facts.get("sic", "n/a") or "n/a", "source": edgar_url},
+                "fiscal_year_end": {"value": facts.get("fiscal_year_end") or "n/a",
+                                    "source": edgar_url},
+                "revenue_latest_10k": {
+                    "value": (f"{_fmt_usd(rev['value'])} (FY{rev.get('fy')})"
+                              if rev.get("value") else "n/a"),
+                    "source": rev.get("url", edgar_url),
+                },
+                "rd_expense_latest_10k": {
+                    "value": (f"{_fmt_usd(rd['value'])} (FY{rd.get('fy')})"
+                              if rd.get("value") else "n/a"),
+                    "source": rd.get("url", edgar_url),
+                },
+                "net_income_latest_10k": {
+                    "value": (f"{_fmt_usd(net['value'])} (FY{net.get('fy')})"
+                              if net.get("value") else "n/a"),
+                    "source": net.get("url", edgar_url),
+                },
+                "total_assets_latest_10k": {
+                    "value": (f"{_fmt_usd(assets['value'])} (FY{assets.get('fy')})"
+                              if assets.get("value") else "n/a"),
+                    "source": assets.get("url", edgar_url),
+                },
+                "employees": {
+                    "value": (f"{int(emp['value']):,} (FY{emp.get('fy')})"
+                              if emp.get("value") else "n/a"),
+                    "source": emp.get("url", edgar_url),
+                },
+            },
+            "sec_filings": {
+                "10-K (Annual Report)": filings_by_form.get("10-K", []),
+                "10-Q (Quarterly Report)": filings_by_form.get("10-Q", []),
+                "8-K (Material Events)": filings_by_form.get("8-K", []),
+                "DEF 14A (Proxy Statement)": filings_by_form.get("DEF 14A", []),
+                "S-1 (Registration)": filings_by_form.get("S-1", []),
             },
             "pipeline": pipeline,
             "partnering_history": partnering,
@@ -395,6 +442,23 @@ class ReportBuilder:
                     g.get("url", ""), "NIH Reporter",
                     str(g.get("fiscal_year", "")))
         return refs[:30]
+
+
+def _fmt_usd(val) -> str:
+    """Format a large USD number compactly: 16,286,000,000 -> '$16.3B'."""
+    try:
+        n = float(val)
+    except (TypeError, ValueError):
+        return "n/a"
+    sign = "-" if n < 0 else ""
+    n = abs(n)
+    if n >= 1e9:
+        return f"{sign}${n/1e9:.2f}B"
+    if n >= 1e6:
+        return f"{sign}${n/1e6:.1f}M"
+    if n >= 1e3:
+        return f"{sign}${n/1e3:.0f}K"
+    return f"{sign}${n:.0f}"
 
 
 def _first_trial_url(c: dict) -> str:
