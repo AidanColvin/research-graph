@@ -74,6 +74,11 @@ class ReportBuilder:
     # ── Section helpers ─────────────────────────────────────────────────────
     def _sector_ctx(self, sector: str) -> dict:
         # Normalize via canonical_sector first so "banking" -> "finance", etc.
+        # Only use curated context when the term resolves to a real canonical
+        # sector (or matches a context key exactly). For free-text/discovered
+        # terms like "healthcare" or "pasta" we deliberately return {} so
+        # Section 1 DERIVES a term-specific definition from the actual companies'
+        # SEC data — never a loosely-matched, wrong-sector curated blurb.
         canon = canonical_sector(sector)
         candidates = [canon, sector.lower().strip()] if canon else [sector.lower().strip()]
         for key in candidates:
@@ -88,10 +93,8 @@ class ReportBuilder:
                     break
             if isinstance(ctx, dict):
                 return ctx
-            for k, v in self.sector_ctx.items():
-                if k != "default" and isinstance(v, dict) and (k in key or key in k):
-                    return v
-        return self.sector_ctx.get("default", {})
+        # No curated match: return empty so the report is built from live data.
+        return {}
 
     def _section1(self, ctx: dict, sector: str, companies: List[dict]) -> dict:
         """Build Section 1, filling any gap in curated context with live data.

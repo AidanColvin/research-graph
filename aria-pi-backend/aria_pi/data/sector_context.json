@@ -1130,7 +1130,56 @@
   "clean energy": "alias:climate tech",
   "renewable energy": "alias:climate tech",
   "solar": "alias:climate tech",
-  "healthcare": "alias:medtech",
+  "healthcare": {
+    "definition": "Healthcare spans the organizations that finance and deliver medical care \u2014 hospital systems, health insurers and managed-care plans, outpatient and post-acute providers, and the services that support them \u2014 regulated largely by CMS and HHS.",
+    "definition_sources": [
+      "https://www.cms.gov",
+      "https://www.hhs.gov"
+    ],
+    "scale": "US national health expenditure exceeds $4.5 trillion per year (about 17% of GDP) per CMS National Health Expenditure data, making healthcare one of the largest sectors of the economy.",
+    "scale_sources": [
+      "https://www.cms.gov/data-research/statistics-trends-reports/national-health-expenditure-data",
+      "https://www.cms.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "CMS continues to expand value-based and Medicare Advantage payment models, reshaping provider and payer economics.",
+        "sources": [
+          "https://www.cms.gov",
+          "https://www.hhs.gov"
+        ]
+      },
+      {
+        "signal": "HHS and CMS are advancing price-transparency and interoperability rules that affect every provider and insurer.",
+        "sources": [
+          "https://www.hhs.gov",
+          "https://www.cms.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina\u2019s healthcare landscape includes UNC Health as the state\u2019s academic safety-net system, alongside large providers and insurers; the NC Department of Health and Human Services administers Medicaid for roughly 3 million residents.",
+    "nc_context_sources": [
+      "https://www.ncdhhs.gov",
+      "https://www.unchealth.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Gillings School of Global Public Health",
+        "focus": "Health policy, management, and health services research.",
+        "url": "https://sph.unc.edu"
+      },
+      {
+        "unit": "Cecil G. Sheps Center for Health Services Research",
+        "focus": "Health systems, access, and outcomes research.",
+        "url": "https://www.shepscenter.unc.edu"
+      },
+      {
+        "unit": "UNC School of Medicine",
+        "focus": "Clinical care delivery and translational research.",
+        "url": "https://www.med.unc.edu"
+      }
+    ]
+  },
   "health tech": "alias:medtech",
   "biomedical": "alias:biotech",
   "genomics": "alias:biotech",
@@ -1139,5 +1188,50 @@
   "networking": "alias:telecom",
   "payments": "alias:fintech",
   "e-commerce": "alias:retail",
-  "ecommerce": "alias:retail"
+  "ecommerce": "alias:retail",
+  "health it": {
+    "definition": "Health IT and electronic health record (EHR) vendors build the clinical software, data platforms, and analytics that hospitals and clinics use to capture, exchange, and analyze patient data; the federal ONC sets interoperability and certification standards for the sector.",
+    "definition_sources": [
+      "https://www.healthit.gov",
+      "https://www.cms.gov"
+    ],
+    "scale": "The ONC Health IT Certification Program governs certified EHR technology used by the large majority of US hospitals; market leaders include both public vendors (Oracle Health, Veeva) and large private firms (Epic Systems, MEDITECH).",
+    "scale_sources": [
+      "https://www.healthit.gov/topic/certification-ehrs",
+      "https://www.cms.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "ONC TEFCA and information-blocking rules are driving a wave of interoperability and data-exchange investment across EHR vendors.",
+        "sources": [
+          "https://www.healthit.gov/topic/interoperability/policy",
+          "https://www.healthit.gov"
+        ]
+      },
+      {
+        "signal": "CMS continues to tie Medicare incentive payments to certified EHR use and electronic quality reporting.",
+        "sources": [
+          "https://www.cms.gov",
+          "https://www.healthit.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina runs NC HealthConnex, the statewide health information exchange, and UNC Health operates a large Epic-based enterprise EHR, making the state an active testbed for health-IT interoperability.",
+    "nc_context_sources": [
+      "https://hiea.nc.gov",
+      "https://www.unchealth.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "Carolina Health Informatics Program",
+        "focus": "Cross-school biomedical and health informatics research and training.",
+        "url": "https://chip.unc.edu"
+      },
+      {
+        "unit": "UNC School of Medicine",
+        "focus": "Clinical informatics, EHR-based research, and digital health.",
+        "url": "https://www.med.unc.edu"
+      }
+    ]
+  }
 }
