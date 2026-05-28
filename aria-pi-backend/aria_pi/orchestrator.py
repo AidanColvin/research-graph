@@ -130,33 +130,46 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             print(f"{label} failed for {name}: {e}")
             return default
 
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    with ThreadPoolExecutor(max_workers=6) as pool:
         futures = {
             "facts": pool.submit(safe,
                 lambda: sec.get_company_facts(name),
                 "SEC", {"legal_name": name, "source": "https://www.sec.gov"}),
             "trials": pool.submit(safe,
                 lambda: trials.search_by_sponsor(name), "Trials", []),
+            # Generic UNC-affiliated co-authorship search (cast wide net)
             "pubmed": pool.submit(safe,
-                lambda: pubmed.search_unc_with_company(name, max_results=4),
+                lambda: pubmed.search_unc_with_company(name, max_results=10),
                 "PubMed", []),
+            # Per-UNC-school targeted search (Gillings, SOM, Lineberger, etc.)
+            "pubmed_schools": pool.submit(safe,
+                lambda: pubmed.search_by_unc_schools(name, max_per_school=3),
+                "PubMed schools", []),
             "pubmed_coi": pool.submit(safe,
-                lambda: pubmed.search_coi_disclosures(name, max_results=3),
+                lambda: pubmed.search_coi_disclosures(name, max_results=5),
                 "PubMed COI", []),
             "nih_grants": pool.submit(safe,
-                lambda: nih.unc_grants_mentioning(name, max_results=4),
+                lambda: nih.unc_grants_mentioning(name, max_results=10),
                 "NIH Reporter", []),
         }
         results = {k: f.result() for k, f in futures.items()}
+
+    # Merge generic + school-specific PubMed hits, deduped by pmid.
+    pubmed_all = list(results["pubmed"]) + list(results["pubmed_schools"])
+    seen_pmids, pubmed_unique = set(), []
+    for p in pubmed_all:
+        pmid = p.get("pmid")
+        if pmid and pmid not in seen_pmids:
+            seen_pmids.add(pmid); pubmed_unique.append(p)
 
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
     return {
         "name": name,
         "facts": results["facts"],
-        "trials": company_trials[:6],
+        "trials": company_trials[:12],
         "unc_trials": unc_trials,
-        "pubmed": results["pubmed"],
+        "pubmed": pubmed_unique,
         "pubmed_coi": results["pubmed_coi"],
         "nih_grants": results["nih_grants"],
     }

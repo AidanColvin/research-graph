@@ -34,7 +34,9 @@ export default function Home() {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120_000);
+      // Depth over speed — give the backend up to 5 minutes to assemble a
+      // thorough, accurate report rather than truncating sources.
+      const timeout = setTimeout(() => controller.abort(), 300_000);
       const res = await fetch(`${baseUrl}/run-pipeline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,8 +137,10 @@ export default function Home() {
             ))}
           </div>
           <p style={styles.runHint}>
-            Pulling live data from SEC EDGAR, ClinicalTrials.gov, and PubMed.
-            This takes 20–45 seconds.
+            Pulling live data from SEC EDGAR (XBRL financials + filings),
+            ClinicalTrials.gov (trials + collaborators), PubMed
+            (co-authorship + COI disclosures by UNC school), and NIH Reporter.
+            Thoroughness over speed — this can take a minute or two.
           </p>
         </section>
       )}

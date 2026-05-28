@@ -33,6 +33,45 @@ class PubMedClient:
                 f' OR "UNC Chapel Hill"[Affiliation])')
         return self._run(term, max_results)
 
+    # Affiliation phrases for the UNC schools / centers we want to attribute
+    # publications to specifically. Each is queried separately so we know
+    # WHICH UNC unit holds the relationship.
+    UNC_SCHOOLS = [
+        ("Gillings School of Global Public Health",
+         '"Gillings"[Affiliation]'),
+        ("UNC School of Medicine",
+         '("UNC School of Medicine"[Affiliation] '
+         'OR "University of North Carolina School of Medicine"[Affiliation])'),
+        ("UNC Lineberger Comprehensive Cancer Center",
+         '"Lineberger"[Affiliation]'),
+        ("UNC Eshelman School of Pharmacy",
+         '"Eshelman"[Affiliation]'),
+        ("Carolina Health Informatics Program",
+         '("Carolina Health Informatics"[Affiliation] '
+         'OR "Cecil G. Sheps Center"[Affiliation])'),
+    ]
+
+    def search_by_unc_schools(self, company_name: str,
+                              max_per_school: int = 3) -> List[dict]:
+        """Run one PubMed query per UNC school and tag each hit with the school.
+
+        Gives Section 2.2 (UNC Faculty) real school attribution rather than
+        the generic "UNC Chapel Hill (verify school via faculty page)" tag.
+        """
+        results: List[dict] = []
+        for school_name, aff_clause in self.UNC_SCHOOLS:
+            term = (f'("{company_name}"[Title/Abstract]) AND {aff_clause}')
+            hits = self._run(term, max_per_school)
+            for h in hits:
+                h["unc_school"] = school_name
+                results.append(h)
+        # Dedupe by pmid, preserving first school it appeared under
+        seen, out = set(), []
+        for h in results:
+            if h.get("pmid") and h["pmid"] not in seen:
+                seen.add(h["pmid"]); out.append(h)
+        return out
+
     def search_coi_disclosures(self, company_name: str, max_results: int = 3) -> List[dict]:
         """Find UNC-authored papers that disclose a relationship with the company.
 

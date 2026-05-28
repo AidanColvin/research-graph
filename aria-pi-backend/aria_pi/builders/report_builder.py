@@ -125,10 +125,11 @@ class ReportBuilder:
                     "sources": [g.get("url", "https://reporter.nih.gov"),
                                 "https://research.unc.edu/coi"],
                 })
-            for p in (c.get("pubmed") or [])[:2]:
+            for p in (c.get("pubmed") or [])[:5]:
+                school = p.get("unc_school") or "UNC Chapel Hill (per PubMed affiliation)"
                 known.append({
                     "company": cname,
-                    "unc_unit": "UNC Chapel Hill (per PubMed affiliation)",
+                    "unc_unit": school,
                     "relationship_type": f"Co-authored publication ({p.get('year', 'n.d.')}) — "
                                          f"{p.get('journal', '')}",
                     "active": "Unknown",
@@ -162,29 +163,30 @@ class ReportBuilder:
             })
 
         for c in companies:
-            for g in (c.get("nih_grants") or [])[:3]:
+            for g in (c.get("nih_grants") or [])[:5]:
                 pi = g.get("pi") or ""
                 if pi:
                     add_faculty(
                         pi,
                         g.get("department") or g.get("organization") or "UNC Chapel Hill",
                         f"NIH-funded research overlapping with {c['name']}: "
-                        f"{g.get('title', '')[:120]}",
+                        f"{g.get('title', '')[:160]}",
                         [g.get("url", "https://reporter.nih.gov"),
                          "https://research.unc.edu"],
                     )
-            for p in (c.get("pubmed") or [])[:3]:
+            for p in (c.get("pubmed") or [])[:5]:
                 authors = p.get("authors") or []
+                school = p.get("unc_school") or "UNC Chapel Hill"
                 if authors:
                     add_faculty(
                         authors[0],
-                        "UNC Chapel Hill (verify school via faculty page)",
+                        school,
                         f"Co-authored publication with {c['name']}: "
-                        f"{p.get('title', '')[:120]}",
+                        f"{p.get('title', '')[:160]}",
                         [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
                          "https://www.unc.edu"],
                     )
-            if len(unc_faculty) >= 10:
+            if len(unc_faculty) >= 20:
                 break
 
         # ── Data assets: show all curated UNC datasets (analysts filter, not us).
