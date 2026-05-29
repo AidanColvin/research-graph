@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>map · Information Flow</title>
+<style>
+  :root{
+    --ink:#0a0a0a; --muted:#777; --line:#e5e5e5; --soft:#fafafa;
+    --indigo:#3730a3; --indigoBg:#e0e7ff;
+    --green:#166534; --greenBg:#dcfce7;
+    --amber:#92400e; --amberBg:#fef3c7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:#fff; color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:40px 28px 80px; max-width:1180px; margin:0 auto;
+  }
+  .eyebrow{font-size:11px;letter-spacing:.22em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.03em;margin:0 0 6px;}
+  .sub{color:var(--muted);margin:0 0 34px;font-size:16px;}
+
+  .rail{display:flex;flex-direction:column;gap:0;}
+  .stage{
+    display:grid;grid-template-columns:46px 1fr;gap:18px;align-items:start;position:relative;
+  }
+  .spine{display:flex;flex-direction:column;align-items:center;}
+  .dot{
+    width:14px;height:14px;border-radius:50%;background:var(--ink);margin-top:22px;flex:none;z-index:2;
+    box-shadow:0 0 0 4px #fff;
+  }
+  .pipe{width:2px;flex:1;background:linear-gradient(#0a0a0a, #0a0a0a);position:relative;overflow:hidden;min-height:30px;}
+  /* moving packet of information */
+  .pipe::after{
+    content:"";position:absolute;left:-3px;width:8px;height:8px;border-radius:50%;
+    background:var(--indigo);box-shadow:0 0 8px var(--indigo);
+    animation:flow 2.4s linear infinite;
+  }
+  @keyframes flow{0%{top:-10px;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+  .stage:nth-child(2) .pipe::after{animation-delay:.3s}
+  .stage:nth-child(3) .pipe::after{animation-delay:.6s}
+  .stage:nth-child(4) .pipe::after{animation-delay:.9s}
+  .stage:nth-child(5) .pipe::after{animation-delay:1.2s}
+  .stage:nth-child(6) .pipe::after{animation-delay:1.5s}
+  .stage:nth-child(7) .pipe::after{animation-delay:1.8s}
+
+  .card{
+    border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;background:#fff;
+  }
+  .card h3{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .tag{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;}
+  .tag.fe{background:#111;color:#fff;}
+  .tag.be{background:var(--indigoBg);color:var(--indigo);}
+  .tag.ext{background:var(--greenBg);color:var(--green);}
+  .tag.out{background:var(--amberBg);color:var(--amber);}
+  .card p{margin:8px 0 0;color:#374151;font-size:14px;}
+  .payload{
+    margin-top:10px;display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12px;color:var(--indigo);background:var(--indigoBg);padding:3px 9px;border-radius:7px;
+  }
+  .arrowlabel{font-size:12px;color:var(--muted);margin:2px 0 10px 64px;font-style:italic;}
+
+  /* external sources fan-out */
+  .sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px;}
+  .src{border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:12px 14px;background:var(--soft);}
+  .src b{font-size:13px;}
+  .src span{display:block;font-size:12px;color:var(--muted);margin-top:3px;}
+
+  .legend{margin-top:30px;display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center;}
+  .legend .chip{display:inline-flex;align-items:center;gap:6px;}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .foot{margin-top:36px;font-size:12px;color:#bbb;letter-spacing:.05em;}
+</style>
+</head>
+<body>
+  <div class="eyebrow">map · System Data Flow</div>
+  <h1>How a search becomes a sourced report</h1>
+  <p class="sub">Every box is a real stage in the stack. The moving dots trace one packet of information from a typed sector to a downloadable, citation-checked report.</p>
+
+  <div class="rail">
+
+    <!-- 1 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div><div class="pipe"></div></div>
+      <div>
+        <div class="card">
+          <h3>1 · User <span class="tag fe">Browser</span></h3>
+          <p>Types a sector — anything from <em>Oncology</em> to <em>HVAC</em> to <em>Craft Beer</em> — and presses Generate on the public page.</p>
+          <span class="payload">{ sector: "HVAC" }</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div><div class="pipe"></div></div>
+      <div>
+        <div class="card">
+          <h3>2 · Next.js API Proxy <span class="tag fe">/api/run-pipeline</span></h3>
+          <p>The frontend POSTs the term to its own route. Marked <code>force-dynamic</code> + <code>no-store</code>, so no stale report is ever served from cache — every search is fresh.</p>
+          <span class="payload">POST → cache: "no-store"</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div><div class="pipe"></div></div>
+      <div>
+        <div class="card">
+          <h3>3 · Backend Orchestrator <span class="tag be">FastAPI · Vercel</span></h3>
+          <p>Resolves the term to companies via <code>canonical_sector()</code>:</p>
+          <p style="margin-top:6px;">
+            &bull; <b>curated</b> — known sector → hand-picked list &nbsp;|&nbsp;
+            <b>discovered</b> — niche term → live SEC EDGAR full-text search &nbsp;|&nbsp;
+            <b>default</b> — fallback anchors
+          </p>
+          <span class="payload">resolution + [ company, company, … ]</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div><div class="pipe"></div></div>
+      <div>
+        <div class="card">
+          <h3>4 · Live Source Fetch <span class="tag ext">parallel · no API keys</span></h3>
+          <p>For each company, the orchestrator pulls primary-source data in parallel:</p>
+          <div class="sources">
+            <div class="src"><b>SEC EDGAR</b><span>XBRL financials, submissions &amp; filings</span></div>
+            <div class="src"><b>ClinicalTrials.gov</b><span>trials &amp; collaborators</span></div>
+            <div class="src"><b>PubMed (Entrez)</b><span>co-authorship &amp; COI disclosures</span></div>
+            <div class="src"><b>NIH RePORTER</b><span>federal grants</span></div>
+          </div>
+          <span class="payload">raw facts + source URLs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div><div class="pipe"></div></div>
+      <div>
+        <div class="card">
+          <h3>5 · Report Builder + Verifier <span class="tag be">deterministic</span></h3>
+          <p>Assembles Sections 1–7. The source tagger double-checks every claim against ≥2 sources (AMA style) and flags anything unverified. A <code>generated_at</code> timestamp is stamped on.</p>
+          <span class="payload">JSON report { report_meta, sections, references, _meta }</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div><div class="pipe"></div></div>
+      <div>
+        <div class="card">
+          <h3>6 · Render <span class="tag fe">Report.tsx</span></h3>
+          <p>The frontend normalizes the JSON, builds an AMA citation index (numbering every unique URL), and paints the report — superscript citations, tables, profile cards, references.</p>
+          <span class="payload">on-screen report + ¹²³ citations</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="stage">
+      <div class="spine"><div class="dot"></div></div>
+      <div>
+        <div class="card" style="border-color:var(--amber);">
+          <h3>7 · Download <span class="tag out">Markdown · PDF · Word</span></h3>
+          <p>One click flattens the report into a format-neutral <b>block IR</b>, then renders the same content + citation numbers to three files — formatting stays identical across all three.</p>
+          <span class="payload">.md &nbsp;·&nbsp; .pdf &nbsp;·&nbsp; .docx</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="legend">
+    <span class="chip"><span class="swatch" style="background:#111"></span> Frontend (Next.js)</span>
+    <span class="chip"><span class="swatch" style="background:var(--indigo)"></span> Backend (FastAPI)</span>
+    <span class="chip"><span class="swatch" style="background:var(--green)"></span> External primary sources</span>
+    <span class="chip"><span class="swatch" style="background:var(--amber)"></span> Exports</span>
+    <span class="chip"><span class="swatch" style="background:var(--indigo);border-radius:50%"></span> = information packet in motion</span>
+  </div>
+
+  <div class="foot">map · Innovate Carolina · UNC Chapel Hill — no API keys, every claim cites SEC / PubMed / ClinicalTrials.gov / NIH</div>
+</body>
+</html>

@@ -110,7 +110,7 @@ export default function Home() {
   return (
     <main style={styles.main}>
       <header style={styles.header}>
-        <div style={styles.brand}>ARIA</div>
+        <div style={styles.brand}>map</div>
         {status === 'done' && (
           <button onClick={reset} style={styles.newSearch}>← New search</button>
         )}
