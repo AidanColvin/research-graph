@@ -58,9 +58,8 @@ export default function Home() {
   const [sector, setSector] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [stageIdx, setStageIdx] = useState(0);
-  // True once the dot has passed every line and we're holding on the last one
-  // (pulsing) until the backend data finishes arriving.
-  const [waiting, setWaiting] = useState(false);
+  // Live "N of M companies analyzed" count from the real backend stream.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,12 +69,104 @@ export default function Home() {
     setError(null);
     setData(null);
     setStageIdx(0);
-    setWaiting(false);
+    setProgress(null);
 
-    // Kick off the real backend fetch immediately, in parallel with the
-    // line-by-line dot animation below. We capture the result here rather than
-    // setting state right away so the report only loads AFTER the dot has
-    // visibly travelled past every line.
+    // Prefer the live progress stream (real backend events drive the dots).
+    // If streaming is unavailable or fails before delivering the report, fall
+    // back to the plain endpoint + cosmetic timer so a report still loads.
+    const ok = await runStreaming();
+    if (!ok) await runFallback();
+  }
+
+  // Map a real backend signal to which progress line the dot should be on.
+  // Lines 0–1 are setup, 2–7 track company data collection, 8 is verification,
+  // 9 is final assembly.
+  const DATA_FIRST = 2;   // first line driven by company completion
+  const DATA_LINES = 6;   // lines 2..7 inclusive
+
+  // Live-stream path: read Server-Sent Events and advance the dots on genuine
+  // backend milestones. Returns true if it loaded the report, false to fall back.
+  async function runStreaming(): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 300_000);
+      const res = await fetch('/api/run-pipeline-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sector }),
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) {
+        clearTimeout(timeout);
+        return false;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let finalData: ReportData | null = null;
+      let failed = false;
+
+      const handle = (ev: any) => {
+        if (ev.type === 'stage') {
+          if (ev.key === 'resolved') {
+            setProgress({ done: 0, total: ev.total || 0 });
+            setStageIdx((p) => Math.max(p, 1));
+          } else if (ev.key === 'building') {
+            setStageIdx((p) => Math.max(p, 8));
+          } else if (ev.key === 'verifying') {
+            setStageIdx((p) => Math.max(p, 8));
+          }
+        } else if (ev.type === 'progress') {
+          setProgress({ done: ev.done, total: ev.total });
+          const frac = ev.total ? ev.done / ev.total : 0;
+          const target = Math.min(
+            DATA_FIRST + DATA_LINES - 1,
+            DATA_FIRST + Math.floor(frac * DATA_LINES),
+          );
+          setStageIdx((p) => Math.max(p, target));
+        } else if (ev.type === 'done') {
+          finalData = (ev.report ?? null) as ReportData | null;
+          setStageIdx(STAGES.length - 1);
+        } else if (ev.type === 'error') {
+          failed = true;
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const frames = buf.split('\n\n');
+        buf = frames.pop() ?? '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            handle(JSON.parse(line.slice(5).trim()));
+          } catch {
+            /* ignore malformed frame */
+          }
+        }
+      }
+      clearTimeout(timeout);
+
+      if (finalData && !failed) {
+        setData(finalData);
+        setStatus('done');
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // Fallback path: plain request + cosmetic line timer (original behavior).
+  async function runFallback(): Promise<void> {
+    setStageIdx(0);
+    setProgress(null);
+
     const result: { data?: ReportData; error?: string } = {};
     const fetchPromise = (async () => {
       try {
@@ -98,18 +189,11 @@ export default function Home() {
       }
     })();
 
-    // Move the black dot down one line at a time — every stage gets its moment
-    // so the user always sees it travel the full list.
     for (let i = 0; i < STAGES.length; i++) {
       setStageIdx(i);
       await sleep(STAGE_MS);
     }
-
-    // All lines have been passed. Only now do we wait for the data to be ready
-    // (the last dot pulses during any remaining backend time), then load page 3.
-    setWaiting(true);
     await fetchPromise;
-    setWaiting(false);
 
     if (result.error) {
       setError(result.error);
@@ -126,7 +210,7 @@ export default function Home() {
     setError(null);
     setSector('');
     setStageIdx(0);
-    setWaiting(false);
+    setProgress(null);
   }
 
   // Inline autocomplete: ghost suffix shown after what the user typed.
@@ -225,9 +309,9 @@ export default function Home() {
               // is black; lines still ahead are grey. The current line is bold.
               const reached = i <= stageIdx;
               const active = i === stageIdx;
-              // While holding for the backend, the final dot pulses to show the
-              // report is still being built even though every line is passed.
-              const pulsing = waiting && i === STAGES.length - 1;
+              // The active line's dot pulses to show work is happening there
+              // right now (driven by real stream events, or the fallback timer).
+              const pulsing = active;
               return (
                 <div key={s} style={styles.stepRow}>
                   <div style={{
@@ -246,9 +330,11 @@ export default function Home() {
               );
             })}
           </div>
-          {waiting ? (
+          {progress && progress.total > 0 ? (
             <p style={{ ...styles.runHint, color: '#666', marginTop: 28 }}>
-              Compiling {sector} report — assembling up to 22 company profiles, NC-based companies, and UNC partnership data. Almost there.
+              Analyzed <strong>{progress.done}</strong> of {progress.total} companies
+              — pulling live SEC EDGAR, ClinicalTrials.gov, PubMed, and NIH data,
+              then verifying every claim against ≥2 sources.
             </p>
           ) : (
             <p style={styles.runHint}>

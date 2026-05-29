@@ -13,10 +13,11 @@ Flow per request:
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
+import json
 import time
 import uvicorn
 
@@ -111,6 +112,100 @@ async def run_pipeline(req: PipelineRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _sse(obj: dict) -> str:
+    """Format one object as a Server-Sent Events `data:` frame."""
+    return f"data: {json.dumps(obj)}\n\n"
+
+
+@app.post("/run-pipeline-stream")
+async def run_pipeline_stream(req: PipelineRequest):
+    """Same pipeline as /run-pipeline, but streams real progress events.
+
+    Emits SSE frames so the frontend can tie its progress UI to genuine
+    backend work rather than a timer:
+      • {type:"stage", key:"resolved", total:N}  — company list resolved
+      • {type:"progress", done:k, total:N, company:"…"}  — each company done
+      • {type:"stage", key:"building"}            — assembling the report
+      • {type:"stage", key:"verifying"}           — source validation
+      • {type:"done", report:{…}}                 — finished report payload
+      • {type:"error", message:"…"}               — failure (frontend falls back)
+    """
+    def gen():
+        try:
+            sec = SECEdgarClient()
+            trials = ClinicalTrialsClient()
+            tagger = SourceTagger()
+            builder = ReportBuilder()
+            pubmed = PubMedClient()
+            nih = NIHReporterClient()
+
+            override = req.companies or ([req.company_override] if req.company_override else None)
+            seeds, resolution = _resolve_seeds(req.sector, override, sec)
+            seeds = seeds[:22]
+            total = len(seeds)
+            yield _sse({"type": "stage", "key": "resolved",
+                        "total": total, "resolution": resolution})
+
+            # Fetch every company concurrently, emitting a progress frame as
+            # each one finishes — this is the genuine, granular signal that
+            # drives the frontend progress bar.
+            out_by_name = {n: _empty_company(n) for n in seeds}
+            done = 0
+            deadline = time.monotonic() + FETCH_BUDGET_SECONDS
+            with ThreadPoolExecutor(max_workers=len(seeds)) as pool:
+                fut_to_name = {
+                    pool.submit(_fetch_one_company, n, sec=sec, trials=trials,
+                                pubmed=pubmed, nih=nih): n
+                    for n in seeds
+                }
+                try:
+                    for fut in as_completed(fut_to_name,
+                                            timeout=FETCH_BUDGET_SECONDS + 2):
+                        name = fut_to_name[fut]
+                        try:
+                            out_by_name[name] = fut.result(timeout=0.1)
+                        except Exception as e:
+                            print(f"stream company err {name}: {e}")
+                        done += 1
+                        yield _sse({"type": "progress", "done": done,
+                                    "total": total, "company": name})
+                except FuturesTimeout:
+                    # Deadline hit — remaining companies keep their SEC-only stubs.
+                    print("stream fetch deadline reached")
+
+            company_data = [out_by_name[n] for n in seeds]
+
+            yield _sse({"type": "stage", "key": "building"})
+            report = builder.build(req.sector,
+                                   {"sector": req.sector, "companies": company_data})
+
+            yield _sse({"type": "stage", "key": "verifying"})
+            report["_validation"] = _validate_report_sources(report, tagger)
+            report["_meta"] = {
+                "mode": "free",
+                "seed_companies": seeds,
+                "resolution": resolution,
+                "pubmed_enabled": bool(pubmed),
+                "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            }
+
+            yield _sse({"type": "done", "report": report})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield _sse({"type": "error", "message": str(e)})
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            # Disable proxy buffering so frames flush as they're produced.
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # Wall-clock budget for the entire data-collection phase. Vercel Hobby caps
