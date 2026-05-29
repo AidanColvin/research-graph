@@ -1,6 +1,7 @@
 'use client';
 
 import React, { CSSProperties } from 'react';
+import { downloadMarkdown, downloadPdf, downloadDocx } from '@/lib/report-export';
 
 type Sourced = { text: string; sources: string[] };
 type SourceList = string[];
@@ -63,7 +64,7 @@ export type ReportData = {
 };
 
 // ── AMA citation index ─────────────────────────────────────────────────────────
-type CitationIndex = {
+export type CitationIndex = {
   numberOf: (url: string) => number;
   list: { id: number; url: string; ama: string }[];
 };
@@ -205,7 +206,7 @@ function collectUrls(node: any, out: string[], seen: Set<string>) {
   }
 }
 
-function buildCitationIndex(data: any): CitationIndex {
+export function buildCitationIndex(data: any): CitationIndex {
   const ordered: string[] = [];
   const seen = new Set<string>();
   collectUrls(data, ordered, seen);
@@ -304,7 +305,7 @@ function Empty({ label }: { label: string }) {
 }
 
 // ── Defensive defaults — any missing field falls back to {} or [] ─────────────
-function normalize(raw: any): ReportData {
+export function normalize(raw: any): ReportData {
   const d = raw || {};
   const sec = (k: string) => d[k] || {};
   const arr = (k: string) => Array.isArray(d[k]) ? d[k] : [];
@@ -387,10 +388,42 @@ export default function Report({ data: rawData }: { data: any }) {
   const m = data.report_meta;
   const v = data._validation;
   const citations = React.useMemo(() => buildCitationIndex(data), [data]);
+  const [busy, setBusy] = React.useState<null | 'md' | 'pdf' | 'docx'>(null);
+
+  async function handleDownload(kind: 'md' | 'pdf' | 'docx') {
+    if (busy) return;
+    try {
+      setBusy(kind);
+      if (kind === 'md') downloadMarkdown(rawData);
+      else if (kind === 'pdf') await downloadPdf(rawData);
+      else await downloadDocx(rawData);
+    } catch (e) {
+      console.error('Download failed:', e);
+      alert('Sorry — that download failed. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <CitationCtx.Provider value={citations}>
     <article style={styles.article}>
+      {/* DOWNLOAD TOOLBAR */}
+      <div style={styles.downloadBar}>
+        <span style={styles.downloadLabel}>Download report</span>
+        <div style={styles.downloadBtns}>
+          <button onClick={() => handleDownload('md')} disabled={!!busy} style={styles.dlBtn}>
+            {busy === 'md' ? 'Saving…' : 'Markdown'}
+          </button>
+          <button onClick={() => handleDownload('pdf')} disabled={!!busy} style={styles.dlBtn}>
+            {busy === 'pdf' ? 'Building…' : 'PDF'}
+          </button>
+          <button onClick={() => handleDownload('docx')} disabled={!!busy} style={styles.dlBtnPrimary}>
+            {busy === 'docx' ? 'Building…' : 'Word (.docx)'}
+          </button>
+        </div>
+      </div>
+
       {/* HEADER */}
       <header style={styles.header}>
         <div style={styles.eyebrow}>Partnership Intelligence Report</div>
@@ -775,6 +808,50 @@ export default function Report({ data: rawData }: { data: any }) {
 
 const styles: Record<string, CSSProperties> = {
   article: { paddingBottom: 120 },
+  downloadBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: '12px 16px',
+    marginBottom: 24,
+    background: '#fafafa',
+    border: '1px solid #eee',
+    borderRadius: 12,
+    position: 'sticky',
+    top: 12,
+    zIndex: 10,
+    backdropFilter: 'saturate(180%) blur(6px)',
+  },
+  downloadLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: '#999',
+  },
+  downloadBtns: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  dlBtn: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#0a0a0a',
+    background: '#fff',
+    padding: '7px 14px',
+    border: '1px solid #ddd',
+    borderRadius: 999,
+    cursor: 'pointer',
+  },
+  dlBtnPrimary: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#fff',
+    background: '#0a0a0a',
+    padding: '7px 14px',
+    border: '1px solid #0a0a0a',
+    borderRadius: 999,
+    cursor: 'pointer',
+  },
   header: {
     borderBottom: '1px solid #e5e5e5',
     paddingBottom: 24,
