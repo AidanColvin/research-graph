@@ -510,7 +510,7 @@ class ReportBuilder:
             "overview": {"text": overview_text,
                          "sources": [edgar_url, _first_trial_url(c)]},
             "partnership_type": "Strategic" if len(trials) > 5 else "Translational",
-            "existing_unc_tie": bool(papers),
+            "existing_unc_tie": bool(papers) or bool(c.get("unc_trials")) or bool(c.get("nih_grants")),
             "facts": _facts_table(facts, ticker, exchange, rev, rd, net, assets, emp, edgar_url),
             "sec_filings": {
                 "10-K (Annual Report)": filings_by_form.get("10-K", []),

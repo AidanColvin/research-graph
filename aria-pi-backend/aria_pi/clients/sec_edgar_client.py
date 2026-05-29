@@ -284,10 +284,33 @@ class SECEdgarClient:
                 "url": url,
             }
 
-        # Try preferred concept, fall back to alternates
-        revenue = (latest_annual("Revenues", "USD")
-                   or latest_annual("RevenueFromContractWithCustomerExcludingAssessedTax", "USD")
-                   or latest_annual("SalesRevenueNet", "USD"))
+        def most_recent(*concept_names: str, unit: str = "USD",
+                        src: dict = us_gaap) -> dict | None:
+            """Pick the most recent annual value across multiple XBRL concept names.
+
+            The naive `or`-chain stops at the first non-None result even when
+            that result is from FY2010 and a later concept has FY2025 data
+            (Apple uses SalesRevenueNet through FY2018, then switches to
+            RevenueFromContractWithCustomerExcludingAssessedTax).  Collecting
+            all candidates and taking the max end-date fixes stale revenue years.
+            """
+            candidates = []
+            for c in concept_names:
+                r = latest_annual(c, unit, src)
+                if r and r.get("value") is not None and r.get("end"):
+                    candidates.append(r)
+            if not candidates:
+                return None
+            return max(candidates, key=lambda r: r.get("end", ""))
+
+        revenue = most_recent(
+            "Revenues",
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "RevenueFromContractWithCustomerIncludingAssessedTax",
+            "SalesRevenueNet",
+            "SalesRevenueGoodsNet",
+            "SalesRevenueServicesNet",
+        )
         return {
             "revenue": revenue,
             "rd_expense": latest_annual("ResearchAndDevelopmentExpense", "USD"),
