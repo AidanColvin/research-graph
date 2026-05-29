@@ -5,12 +5,19 @@ import Report, { ReportData } from '@/components/Report';
 
 type Status = 'idle' | 'running' | 'done' | 'error';
 
+// Ten stages × 10 s = 100 s of visible animation, covering the full
+// backend run (22 companies, SEC + Trials + NIH + PubMed + alumni).
 const STAGES = [
   'Sector overview',
-  'Internal mapping',
   'Company selection',
-  'Profiles',
+  'SEC EDGAR data',
+  'Clinical trials',
+  'NIH grants & PubMed',
+  'NC company profiles',
+  'Leadership analysis',
+  'Pipeline alignment',
   'Verification',
+  'Report assembly',
 ];
 
 // Canonical sectors the backend understands — used for inline autocomplete.
@@ -52,7 +59,7 @@ export default function Home() {
     // screen honest instead of racing to "done" while data is still loading.
     const tick = setInterval(() => {
       setStageIdx((i) => (i < STAGES.length - 1 ? i + 1 : i));
-    }, 6000);
+    }, 10000);
 
     try {
       const controller = new AbortController();
@@ -174,28 +181,42 @@ export default function Home() {
           <div style={styles.runLabel}>Analyzing</div>
           <div style={styles.runSector}>{sector}</div>
           <div style={styles.steps}>
-            {STAGES.map((s, i) => (
-              <div key={s} style={styles.stepRow}>
-                <div style={{
-                  ...styles.stepDot,
-                  background: i <= stageIdx ? '#0a0a0a' : '#e5e5e5',
-                }} />
-                <div style={{
-                  ...styles.stepText,
-                  color: i <= stageIdx ? '#0a0a0a' : '#bdbdbd',
-                  fontWeight: i === stageIdx ? 600 : 400,
-                }}>
-                  {s}
+            {STAGES.map((s, i) => {
+              const done = i < stageIdx;
+              const active = i === stageIdx;
+              const pending = i > stageIdx;
+              const lastAndWaiting = active && i === STAGES.length - 1;
+              return (
+                <div key={s} style={styles.stepRow}>
+                  <div style={{
+                    ...styles.stepDot,
+                    background: (done || active) ? '#0a0a0a' : '#e5e5e5',
+                    opacity: lastAndWaiting ? undefined : 1,
+                    animation: lastAndWaiting ? 'pulse 1.2s ease-in-out infinite' : undefined,
+                  }} />
+                  <div style={{
+                    ...styles.stepText,
+                    color: pending ? '#bdbdbd' : '#0a0a0a',
+                    fontWeight: active ? 600 : 400,
+                  }}>
+                    {s}{done ? ' ✓' : ''}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          <p style={styles.runHint}>
-            Pulling live data from SEC EDGAR (XBRL financials + filings),
-            ClinicalTrials.gov (trials + collaborators), PubMed
-            (co-authorship + COI disclosures by UNC school), and NIH Reporter.
-            Thoroughness over speed — this can take a minute or two.
-          </p>
+          {stageIdx === STAGES.length - 1 && (
+            <p style={{ ...styles.runHint, color: '#666', marginTop: 28 }}>
+              Compiling {sector} report — assembling up to 22 company profiles, NC-based companies, and UNC partnership data. This can take 2–3 minutes.
+            </p>
+          )}
+          {stageIdx < STAGES.length - 1 && (
+            <p style={styles.runHint}>
+              Pulling live data from SEC EDGAR (financials + filings),
+              ClinicalTrials.gov, PubMed, and NIH Reporter across up to 22 companies.
+              Thoroughness over speed — expect 1–3 minutes.
+            </p>
+          )}
         </section>
       )}
 

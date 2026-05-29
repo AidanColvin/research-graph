@@ -200,13 +200,32 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
 
-    # Alumni fetch runs after facts — needs the CIK and DEF 14A URLs from facts
+    # Alumni fetch — two sources merged:
+    #   1. SEC DEF 14A proxy (public companies only, covers board + NEOs)
+    #   2. Company website bio page (all companies, especially private ones)
     cik = str(results["facts"].get("cik") or "")
+    website_url = str(results["facts"].get("website") or "")
     proxy_filings = (results["facts"].get("filings_by_form") or {}).get("DEF 14A", [])
-    unc_alumni = safe(
+
+    proxy_alumni = safe(
         lambda: sec.get_unc_alumni_from_proxy(cik, proxy_filings),
-        "Alumni", [],
-    ) if cik else []  # private companies have no CIK → skip entirely
+        "Alumni-proxy", [],
+    ) if cik and proxy_filings else []
+
+    web_alumni = safe(
+        lambda: sec.get_unc_alumni_from_website(name, website_url),
+        "Alumni-web", [],
+    )
+
+    # Merge, deduplicating by lowercased name
+    seen_names: set = {p["name"].lower().strip() for p in proxy_alumni}
+    merged = list(proxy_alumni)
+    for p in web_alumni:
+        key = p["name"].lower().strip()
+        if key and key not in seen_names:
+            seen_names.add(key)
+            merged.append(p)
+    unc_alumni = merged[:8]
 
     return {
         "name": name,

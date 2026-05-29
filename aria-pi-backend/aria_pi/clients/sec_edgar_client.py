@@ -424,6 +424,66 @@ class SECEdgarClient:
             print(f'DEF 14A fetch error ({url}): {e}')
             return ''
 
+    def get_unc_alumni_from_website(self, company_name: str,
+                                    website_url: str = '') -> list:
+        """Scrape a company's leadership page and return UNC-educated people.
+
+        Works best for companies with server-rendered HTML bio pages (many NC
+        corporate sites still do this).  JavaScript-heavy SPAs will return an
+        empty shell — we fail gracefully with an empty list.
+        """
+        name_key = company_name.lower().strip()
+        # Start with the hardcoded known URL, then try the SEC-provided website
+        # base, then fall back to common leadership path patterns.
+        candidates: list[str] = []
+        if name_key in _KNOWN_LEADERSHIP_URLS:
+            candidates.append(_KNOWN_LEADERSHIP_URLS[name_key])
+        if website_url:
+            base = website_url.rstrip('/')
+            for path in _LEADERSHIP_PATHS:
+                url = base + path
+                if url not in candidates:
+                    candidates.append(url)
+
+        alumni: list = []
+        seen: set = set()
+        for url in candidates[:5]:  # try at most 5 URLs to stay within budget
+            try:
+                r = requests.get(
+                    url,
+                    headers={'User-Agent': USER_AGENT,
+                             'Accept': 'text/html,application/xhtml+xml'},
+                    timeout=10,
+                    stream=True,
+                )
+                if r.status_code not in (200, 203):
+                    continue
+                # Cap at 300 KB — leadership pages are short; large payloads
+                # are usually JS bundles that won't parse usefully.
+                chunks, size = [], 0
+                for chunk in r.iter_content(chunk_size=8_192):
+                    chunks.append(chunk)
+                    size += len(chunk)
+                    if size >= 300_000:
+                        break
+                raw = b''.join(chunks).decode('utf-8', errors='ignore')
+                # Heuristic: if the page has almost no visible text it's
+                # JS-rendered — skip rather than waste parse time.
+                text_estimate = len(re.sub(r'<[^>]+>', '', raw))
+                if text_estimate < 500:
+                    continue
+                for person in _parse_proxy_for_unc(raw, url):
+                    key = person['name'].lower().strip()
+                    if key and key not in seen:
+                        seen.add(key)
+                        alumni.append(person)
+                if alumni:
+                    break  # found people — no need to try other URLs
+            except Exception as e:
+                print(f'Website alumni fetch error ({url}): {e}')
+                continue
+        return alumni[:8]
+
     def _find_cik(self, company_name: str) -> Optional[str]:
         """Resolve a company name → CIK using SEC's official ticker map first,
         then fall back to full-text search."""
@@ -487,6 +547,38 @@ class SECEdgarClient:
             print(f"SEC search error: {e}")
             return None
 
+
+# ── Company website leadership page URLs ─────────────────────────────────────
+# Known-good direct URLs for leadership / about pages, especially for private
+# NC companies that have no SEC proxy statements.  Falls back to common path
+# patterns when the company isn't listed here.
+_KNOWN_LEADERSHIP_URLS: dict = {
+    'sas institute':   'https://www.sas.com/en_us/company-information/management.html',
+    'red hat':         'https://www.redhat.com/en/about/leadership',
+    'epic games':      'https://www.epicgames.com/site/en-US/about',
+    'lenovo':          'https://www.lenovo.com/us/en/about/management-team/',
+    'bandwidth':       'https://www.bandwidth.com/about/leadership/',
+    'pendo':           'https://www.pendo.io/about/',
+    'truist financial':'https://ir.truist.com/governance/board-of-directors',
+    'first citizens bancshares': 'https://ir.firstcitizens.com/corporate-governance/board-of-directors',
+    'labcorp':         'https://ir.labcorp.com/governance/board-of-directors',
+    'iqvia holdings':  'https://ir.iqvia.com/governance/board-of-directors',
+    'duke energy':     'https://www.duke-energy.com/our-company/about-us/leadership',
+    'nucor corporation': 'https://www.nucor.com/leadership/',
+}
+
+# Common leadership path suffixes to try when no hardcoded URL is available.
+_LEADERSHIP_PATHS = [
+    '/leadership',
+    '/about/leadership',
+    '/about/management',
+    '/about/executive-team',
+    '/about/team',
+    '/company/leadership',
+    '/en/about/leadership',
+    '/investor-relations/governance/board-of-directors',
+    '/about',
+]
 
 # ── DEF 14A proxy-statement UNC alumni parsing ──────────────────────────────
 
