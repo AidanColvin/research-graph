@@ -32,11 +32,19 @@ export default function TrendsView({ data: rawData }: { data: any }) {
     );
   }
 
-  // Aggregate sector revenue & R&D per fiscal year (sum across reporting firms).
+  // Aggregate sector revenue & R&D per fiscal year (sum across reporting firms),
+  // dropping years with thin coverage (sparse early years and the not-yet-filed
+  // latest year) so the trend isn't distorted by who happens to report.
   const aggregate = (key: 'revenue' | 'rd' | 'ni'): Pt[] => {
-    const m = new Map<number, number>();
-    profs.forEach((p) => p[key].forEach((pt) => m.set(pt.fy, (m.get(pt.fy) || 0) + pt.val)));
-    return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([fy, val]) => ({ fy, val }));
+    const sum = new Map<number, number>(); const cnt = new Map<number, number>();
+    profs.forEach((p) => p[key].forEach((pt) => {
+      sum.set(pt.fy, (sum.get(pt.fy) || 0) + pt.val);
+      cnt.set(pt.fy, (cnt.get(pt.fy) || 0) + 1);
+    }));
+    const maxc = Math.max(...cnt.values(), 1);
+    return [...sum.entries()]
+      .filter(([fy]) => (cnt.get(fy) || 0) >= maxc * 0.6)
+      .sort((a, b) => a[0] - b[0]).map(([fy, val]) => ({ fy, val }));
   };
   const aggRev = aggregate('revenue');
   const aggRd = aggregate('rd');
