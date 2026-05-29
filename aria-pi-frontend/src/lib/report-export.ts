@@ -330,62 +330,74 @@ function saveBlob(blob: Blob, filename: string) {
 // This is what makes the PDF / Word look exactly like the webpage: we snapshot
 // the live report element (real charts, tiles, tables, spacing) and slice it
 // into page-height pieces for pagination.
+//
+// Reports can be very tall (a 20-company report is ~70,000 px). A single canvas
+// that big exceeds the browser limit (~16,384 px) and silently fails, breaking
+// the download. So we capture in BANDS that each stay well under the limit,
+// then slice every band into page-height pieces.
 async function captureReportSlices(): Promise<{ dataUrl: string; w: number; h: number }[]> {
   const el = document.getElementById('report-article');
   if (!el) throw new Error('Report element not found');
 
+  // Capture each marked block individually. Every block is small enough to stay
+  // under the browser canvas limit, and capturing the whole (small) element
+  // avoids html2canvas's unreliable y-crop. We then flow the block images down
+  // onto letter-page canvases, splitting any block taller than a page.
+  const blocks = Array.from(el.querySelectorAll<HTMLElement>('[data-export-block]'));
+  if (!blocks.length) throw new Error('No export blocks found');
+
   const { default: html2canvas } = await import('html2canvas');
-  const full = await html2canvas(el, {
-    scale: 2,
-    backgroundColor: '#ffffff',
-    useCORS: true,
-    logging: false,
-    windowWidth: el.scrollWidth,
-    // Skip the on-screen download toolbar so it never appears in the file.
-    ignoreElements: (node) => (node as HTMLElement).classList?.contains('no-export'),
-  });
+  const scale = 2;
+  const pageW = Math.round(el.clientWidth * scale);
+  const pagePx = Math.round(el.clientWidth * (11 / 8.5) * scale);
+  const gap = Math.round(10 * scale);
 
-  // Slice into letter-aspect (8.5 x 11) page-height chunks, breaking on
-  // whitespace-ish rows where possible so we don't cut a line in half.
-  const pageH = Math.floor(full.width * (11 / 8.5));
-  const slices: { dataUrl: string; w: number; h: number }[] = [];
-  let y = 0;
-  while (y < full.height) {
-    let h = Math.min(pageH, full.height - y);
-    // If this isn't the last slice, nudge the cut up to a near-blank row to
-    // avoid slicing through text/charts.
-    if (y + h < full.height) {
-      const cut = findBlankRow(full, y + h, Math.floor(pageH * 0.14));
-      if (cut > y + pageH * 0.5) h = cut - y;
-    }
-    const c = document.createElement('canvas');
-    c.width = full.width;
-    c.height = h;
-    const ctx = c.getContext('2d')!;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, c.width, h);
-    ctx.drawImage(full, 0, y, full.width, h, 0, 0, full.width, h);
-    slices.push({ dataUrl: c.toDataURL('image/png'), w: c.width, h });
-    y += h;
-  }
-  return slices;
-}
+  const pages: HTMLCanvasElement[] = [];
+  let page: HTMLCanvasElement | null = null;
+  let pageCtx: CanvasRenderingContext2D | null = null;
+  let cursorY = 0;
 
-// Scan upward from `from` for an all-white row within `maxUp` px (a clean place
-// to break a page). Returns the row y, or `from` if none found.
-function findBlankRow(canvas: HTMLCanvasElement, from: number, maxUp: number): number {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return from;
-  const w = canvas.width;
-  for (let y = from; y > from - maxUp && y > 0; y--) {
-    const row = ctx.getImageData(0, y, w, 1).data;
-    let blank = true;
-    for (let i = 0; i < row.length; i += 4 * 6) { // sample every 6th px
-      if (row[i] < 250 || row[i + 1] < 250 || row[i + 2] < 250) { blank = false; break; }
+  const startPage = () => {
+    page = document.createElement('canvas');
+    page.width = pageW;
+    page.height = pagePx;
+    pageCtx = page.getContext('2d')!;
+    pageCtx.fillStyle = '#ffffff';
+    pageCtx.fillRect(0, 0, pageW, pagePx);
+    pages.push(page);
+    cursorY = 0;
+  };
+  startPage();
+
+  for (const block of blocks) {
+    const bc = await html2canvas(block, {
+      scale, backgroundColor: '#ffffff', useCORS: true, logging: false,
+      windowWidth: el.scrollWidth,
+    });
+    // Center/scale the block to page width (blocks already ~page width).
+    const drawW = pageW;
+    const ratio = drawW / bc.width;
+    const drawH = Math.round(bc.height * ratio);
+
+    // If the block won't fit in the remaining space and the page already has
+    // content, move to a fresh page (keeps a block from starting at the bottom).
+    if (cursorY > 0 && cursorY + Math.min(drawH, pagePx) > pagePx) startPage();
+
+    let srcY = 0;
+    while (srcY < bc.height) {
+      const availPx = pagePx - cursorY;
+      const srcAvail = Math.floor(availPx / ratio);
+      const srcTake = Math.min(srcAvail, bc.height - srcY);
+      const dstH = Math.round(srcTake * ratio);
+      pageCtx!.drawImage(bc, 0, srcY, bc.width, srcTake, 0, cursorY, drawW, dstH);
+      cursorY += dstH;
+      srcY += srcTake;
+      if (cursorY >= pagePx - 1 && srcY < bc.height) startPage();
     }
-    if (blank) return y;
+    cursorY += gap;
   }
-  return from;
+
+  return pages.map((p) => ({ dataUrl: p.toDataURL('image/png'), w: p.width, h: p.height }));
 }
 
 // ── Chart -> PNG (for Word & PDF) ───────────────────────────────────────────

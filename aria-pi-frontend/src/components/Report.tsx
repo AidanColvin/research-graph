@@ -677,7 +677,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </div>
 
       {/* HEADER */}
-      <header style={styles.header}>
+      <header data-export-block style={styles.header}>
         <div style={styles.eyebrow}>Partnership Intelligence Report</div>
         <h1 style={styles.title}>{m.sector}</h1>
         <div style={styles.metaRow}>
@@ -714,7 +714,7 @@ export default function Report({ data: rawInput }: { data: any }) {
 
       {/* ONE-PAGE SUMMARY — first in the report, full report follows */}
       {nCos > 0 && (
-        <section id="summary" style={styles.summaryPage}>
+        <section id="summary" data-export-block style={styles.summaryPage}>
           <H2 n={0} title="Summary" />
           <p style={styles.overviewHint}>One-page brief. The full sourced report follows.</p>
 
@@ -788,7 +788,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       )}
 
       {/* SECTION 1 */}
-      <section id="sec-1" style={styles.section}>
+      <section id="sec-1" data-export-block style={styles.section}>
         <H2 n={1} title="Sector Overview" />
 
         <H3>1.1 Sector Definition and Scale</H3>
@@ -830,7 +830,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 2 */}
-      <section id="sec-2" style={styles.section}>
+      <section id="sec-2" data-export-block style={styles.section}>
         <H2 n={2} title="Internal Mapping" />
 
         <H3>2.1 Known UNC Partnerships in This Sector</H3>
@@ -884,7 +884,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 3 */}
-      <section id="sec-3" style={styles.section}>
+      <section id="sec-3" data-export-block style={styles.section}>
         <H2 n={3} title="Company Selection" />
 
         <H3>3.2 Companies Selected</H3>
@@ -911,14 +911,16 @@ export default function Report({ data: rawInput }: { data: any }) {
 
       {/* SECTION 4 - Company Profiles */}
       <section id="sec-4" style={styles.section}>
-        <H2 n={4} title="Company Profiles" />
-        {trialsData.length > 0 && (
-          <div style={styles.chartGridSingle}>
-            <HBars title="Clinical-trial programs by company" subtitle="Documented on ClinicalTrials.gov" data={trialsData} />
-          </div>
-        )}
+        <div data-export-block>
+          <H2 n={4} title="Company Profiles" />
+          {trialsData.length > 0 && (
+            <div style={styles.chartGridSingle}>
+              <HBars title="Clinical-trial programs by company" subtitle="Documented on ClinicalTrials.gov" data={trialsData} />
+            </div>
+          )}
+        </div>
         {data.section4_profiles?.map((p, i) => (
-          <div key={i} style={styles.profileCard}>
+          <div key={i} data-export-block style={styles.profileCard}>
             <div style={styles.profileHeader}>
               <h3 style={styles.profileTitle}>{p.company_name}</h3>
               <div style={styles.profileFlags}>
@@ -1092,7 +1094,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 5 */}
-      <section id="sec-5" style={styles.section}>
+      <section id="sec-5" data-export-block style={styles.section}>
         <H2 n={5} title="Value Proposition" />
 
         <H3>5.1 UNC Data Assets</H3>
@@ -1149,7 +1151,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 6 */}
-      <section id="sec-6" style={styles.section}>
+      <section id="sec-6" data-export-block style={styles.section}>
         <H2 n={6} title="Talking Points" />
 
         <H3>Sector Opening</H3>
@@ -1183,7 +1185,7 @@ export default function Report({ data: rawInput }: { data: any }) {
 
       {/* REFERENCES - AMA */}
       {citations.list.length > 0 && (
-        <section id="sec-7" style={styles.section}>
+        <section id="sec-7" data-export-block style={styles.section}>
           <H2 n={7} title="References" />
           <p style={styles.refNote}>Citations follow AMA Manual of Style (11th ed.).</p>
           <ol style={styles.refList}>
