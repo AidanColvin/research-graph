@@ -472,14 +472,18 @@ function HBars({ title, subtitle, data, fmt }: {
   );
 }
 
-// Simple donut chart for categorical splits.
-function Donut({ title, segments }: {
+// Pie / donut chart for categorical splits. solid=true renders a full pie.
+function Donut({ title, segments, solid }: {
   title: string;
   segments: { label: string; value: number; color: string }[];
+  solid?: boolean;
 }) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   if (!total) return null;
-  const R = 42;
+  // For a pie, place the stroked circle at r=30 with a 60-wide stroke so the
+  // fill spans center (0) to the 60px edge. For a donut, r=42 with a 16 ring.
+  const R = solid ? 30 : 42;
+  const sw = solid ? 60 : 16;
   const C = 2 * Math.PI * R;
   let acc = 0;
   return (
@@ -499,7 +503,7 @@ function Donut({ title, segments }: {
                   r={R}
                   fill="none"
                   stroke={s.color}
-                  strokeWidth={16}
+                  strokeWidth={sw}
                   strokeDasharray={`${dash} ${C - dash}`}
                   strokeDashoffset={-acc * C}
                 />
@@ -534,7 +538,7 @@ function Tile({ label, value }: { label: string; value: React.ReactNode }) {
 
 // Floating, scroll-spy table of contents shown only on wide screens.
 const TOC_ITEMS = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'summary', label: 'Summary (1-page)' },
   { id: 'sec-1', label: '1 · Sector Overview' },
   { id: 'sec-2', label: '2 · Internal Mapping' },
   { id: 'sec-3', label: '3 · Company Selection' },
@@ -631,6 +635,12 @@ export default function Report({ data: rawInput }: { data: any }) {
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
+  // "What SEC filings show now" — financial snapshot from XBRL.
+  const combinedRev = revenueData.reduce((s, d) => s + d.value, 0);
+  const topRev = revenueData[0];
+  const topRd = rdData[0];
+  const uncUnits = data.section1_overview.unc_units || [];
+
   async function handleDownload(kind: 'md' | 'pdf' | 'docx') {
     if (busy) return;
     try {
@@ -702,11 +712,11 @@ export default function Report({ data: rawInput }: { data: any }) {
         )}
       </header>
 
-      {/* EXECUTIVE OVERVIEW — 10-second scan */}
+      {/* ONE-PAGE SUMMARY — first in the report, full report follows */}
       {nCos > 0 && (
-        <section id="overview" style={styles.section}>
-          <H2 n={0} title="Overview" />
-          <p style={styles.overviewHint}>A ten-second scan. The full sourced report follows below.</p>
+        <section id="summary" style={styles.summaryPage}>
+          <H2 n={0} title="Summary" />
+          <p style={styles.overviewHint}>One-page brief. The full sourced report follows.</p>
 
           <div style={styles.tileGrid}>
             <Tile label="Companies reviewed" value={nCos} />
@@ -729,15 +739,10 @@ export default function Report({ data: rawInput }: { data: any }) {
               scientists already study related work.</>
             )}
           </p>
-          {data.section6_talking_points?.sector_opening?.text && (
-            <p style={styles.claim}>
-              {data.section6_talking_points.sector_opening.text}
-              <Cite urls={data.section6_talking_points.sector_opening.sources} />
-            </p>
-          )}
 
           <div style={styles.chartGrid}>
             <Donut
+              solid
               title="Existing UNC connection"
               segments={[
                 { label: 'Existing tie', value: tied.length, color: '#0a0a0a' },
@@ -745,6 +750,7 @@ export default function Report({ data: rawInput }: { data: any }) {
               ]}
             />
             <Donut
+              solid
               title="Partnership scale"
               segments={[
                 { label: 'Strategic', value: strategic, color: '#0a0a0a' },
@@ -752,6 +758,32 @@ export default function Report({ data: rawInput }: { data: any }) {
               ]}
             />
           </div>
+
+          {(topRev || topRd) && (
+            <p style={styles.summaryLine}>
+              <strong>What SEC filings show now.</strong>{' '}
+              {revenueData.length > 0 && (
+                <>Across {revenueData.length} public {revenueData.length === 1 ? 'company' : 'companies'},
+                latest reported revenue totals {fmtUsd(combinedRev)}. </>
+              )}
+              {topRev && <>{topRev.label} is largest at {fmtUsd(topRev.value)}. </>}
+              {topRd && <>{topRd.label} leads R&D spend at {fmtUsd(topRd.value)}.</>}
+            </p>
+          )}
+
+          {data.section1_overview.nc_context?.text && (
+            <p style={styles.summaryLine}>
+              <strong>NC context.</strong> {data.section1_overview.nc_context.text}
+              <Cite urls={data.section1_overview.nc_context.sources} />
+            </p>
+          )}
+
+          {uncUnits.length > 0 && (
+            <p style={styles.summaryLine}>
+              <strong>UNC schools and centers active.</strong>{' '}
+              {uncUnits.map((u) => u.unit).join(', ')}.
+            </p>
+          )}
         </section>
       )}
 
@@ -1655,6 +1687,15 @@ const styles: Record<string, CSSProperties> = {
   legendSwatch: { width: 12, height: 12, borderRadius: 3, flexShrink: 0, display: 'inline-block' },
   chartNote: { fontSize: 12, color: '#999', marginTop: 16, lineHeight: 1.6, fontStyle: 'italic' },
 
+  // One-page summary
+  summaryPage: {
+    marginTop: 56,
+    paddingBottom: 28,
+    borderBottom: '2px solid #0a0a0a',
+    // Print: keep the brief on its own page, full report starts after.
+    breakAfter: 'page',
+  },
+  summaryLine: { fontSize: 14, lineHeight: 1.6, color: '#1f2937', marginTop: 10 },
   // Executive overview
   overviewHint: { fontSize: 13, color: '#999', marginTop: -8, marginBottom: 18 },
   tileGrid: {

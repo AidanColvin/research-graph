@@ -21,7 +21,8 @@ export type Block =
   | { t: 'list'; items: string[] }
   | { t: 'table'; headers: string[]; rows: string[][] }
   | { t: 'refs'; items: { id: number; text: string; url: string }[] }
-  | { t: 'chart'; chartKind: 'bars' | 'donut'; title: string; subtitle?: string; series: ChartSeries[]; money?: boolean };
+  | { t: 'pagebreak' }
+  | { t: 'chart'; chartKind: 'bars' | 'donut'; title: string; subtitle?: string; series: ChartSeries[]; money?: boolean; solid?: boolean };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -106,8 +107,8 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
     .filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
 
   if (nCos > 0) {
-    b.push({ t: 'h2', text: 'Overview' });
-    b.push({ t: 'p', text: 'A ten-second scan. The full sourced report follows below.' });
+    b.push({ t: 'h2', text: 'Summary' });
+    b.push({ t: 'p', text: 'One-page brief. The full sourced report follows.' });
     b.push({ t: 'meta', pairs: [
       ['Companies reviewed', String(nCos)],
       ['Documented UNC tie', String(tied.length)],
@@ -120,16 +121,29 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
       + `${strategic} ${strategic === 1 ? 'is' : 'are'} large enough to anchor a strategic deal${ncBased > 0 ? ` (${ncBased} based in North Carolina)` : ''}.`
       + (topTied.length ? ` The best first targets are ${topTied.join(', ')}, where UNC scientists already study related work.` : '');
     b.push({ t: 'p', text: thesis });
-    const so = data.section6_talking_points?.sector_opening;
-    if (so?.text) b.push({ t: 'p', text: so.text + mark(so.sources, cites) });
-    b.push({ t: 'chart', chartKind: 'donut', title: 'Existing UNC connection', series: [
+    b.push({ t: 'chart', chartKind: 'donut', solid: true, title: 'Existing UNC connection', series: [
       { label: 'Existing tie', value: tied.length, color: '#0a0a0a' },
       { label: 'No documented tie', value: nCos - tied.length, color: '#d4d4d4' },
     ] });
-    b.push({ t: 'chart', chartKind: 'donut', title: 'Partnership scale', series: [
+    b.push({ t: 'chart', chartKind: 'donut', solid: true, title: 'Partnership scale', series: [
       { label: 'Strategic', value: strategic, color: '#0a0a0a' },
       { label: 'Translational', value: translational, color: '#9a988f' },
     ] });
+    // What SEC filings show now
+    const combinedRev = revSeries.reduce((s, d) => s + d.value, 0);
+    const topRev = revSeries[0], topRd = rdSeries[0];
+    if (topRev || topRd) {
+      let secLine = 'What SEC filings show now. ';
+      if (revSeries.length) secLine += `Across ${revSeries.length} public ${revSeries.length === 1 ? 'company' : 'companies'}, latest reported revenue totals ${fmtUsd(combinedRev)}. `;
+      if (topRev) secLine += `${topRev.label} is largest at ${fmtUsd(topRev.value)}. `;
+      if (topRd) secLine += `${topRd.label} leads R&D spend at ${fmtUsd(topRd.value)}.`;
+      b.push({ t: 'p', text: secLine });
+    }
+    const nc = data.section1_overview.nc_context;
+    if (nc?.text) b.push({ t: 'p', text: `NC context. ${nc.text}` + mark(nc.sources, cites) });
+    const units = data.section1_overview.unc_units || [];
+    if (units.length) b.push({ t: 'p', text: `UNC schools and centers active. ${units.map((u) => u.unit).join(', ')}.` });
+    b.push({ t: 'pagebreak' });
   }
 
   // Section 1 - Sector Overview
@@ -336,7 +350,7 @@ async function renderChartPng(blk: Extract<Block, { t: 'chart' }>): Promise<{ da
       ctx.fillStyle = s.color || '#999999'; ctx.fill();
       start += ang;
     });
-    ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+    if (!blk.solid) { ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill(); }
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
     ctx.font = '13px Calibri, Arial, sans-serif';
     let ly = 58;
@@ -417,6 +431,9 @@ export function blocksToMarkdown(blocks: Block[]): string {
       case 'refs':
         out.push(blk.items.map((r) => `${r.id}. ${r.text} ${r.url}`).join('\n') + '\n');
         break;
+      case 'pagebreak':
+        out.push('\n---\n');
+        break;
       case 'chart': {
         out.push(`\n**${blk.title}**${blk.subtitle ? ` (${blk.subtitle})` : ''}\n`);
         out.push(`| ${blk.chartKind === 'donut' ? 'Segment' : 'Company'} | Value |`);
@@ -443,7 +460,7 @@ export async function downloadDocx(rawData: any) {
   const { blocks } = buildBlocks(rawData);
   const {
     Document, Packer, Paragraph, TextRun, HeadingLevel,
-    Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun,
+    Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun, PageBreak,
   } = await import('docx');
 
   // Pre-render every chart to a PNG up front (async), keyed by index, so the
@@ -466,6 +483,9 @@ export async function downloadDocx(rawData: any) {
     switch (blk.t) {
       case 'h1':
         children.push(new Paragraph({ text: blk.text, heading: HeadingLevel.TITLE }));
+        break;
+      case 'pagebreak':
+        children.push(new Paragraph({ children: [new PageBreak()] }));
         break;
       case 'h2':
         children.push(new Paragraph({ text: blk.text, heading: HeadingLevel.HEADING_1, spacing: { before: 240, after: 120 } }));
@@ -603,6 +623,7 @@ export async function downloadPdf(rawData: any) {
   blocks.forEach((blk, blkIdx) => {
     switch (blk.t) {
       case 'h1': writeText(blk.text, 24, { bold: true, color: [10, 10, 10], gapAfter: 10 }); break;
+      case 'pagebreak': doc.addPage(); y = margin; break;
       case 'h2': writeText(blk.text, 16, { bold: true, color: [10, 10, 10], gapBefore: 14, gapAfter: 8 }); break;
       case 'h3': writeText(blk.text, 12, { bold: true, color: [10, 10, 10], gapBefore: 8, gapAfter: 4 }); break;
       case 'p': writeText(blk.text, 10.5); break;
