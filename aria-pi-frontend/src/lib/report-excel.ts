@@ -1,10 +1,12 @@
 /**
- * Excel export — turns the report's quantitative data into a multi-worksheet
- * .xlsx workbook for company comparison and analysis. Built from the same
- * normalized report the web view uses, so the numbers always match.
+ * Excel export — a multi-worksheet analytics workbook built from the report.
+ * Goes well beyond the report tables: financial ratios, rankings, a partnership
+ * priority model, distributions, and sector-level statistics. Numbers come from
+ * the shared analytics engine so the workbook matches the on-screen view.
  */
-import { normalize, parseMoney } from '@/components/Report';
+import { normalize } from '@/components/Report';
 import { reportFilename } from '@/lib/report-export';
+import { computeAnalytics } from '@/lib/report-analytics';
 
 type Row = (string | number | null)[];
 
@@ -13,139 +15,170 @@ function autoCols(rows: Row[]): { wch: number }[] {
   for (const r of rows) {
     r.forEach((c, i) => {
       const len = c == null ? 0 : String(c).length;
-      widths[i] = Math.max(widths[i] || 10, Math.min(60, len + 2));
+      widths[i] = Math.max(widths[i] || 10, Math.min(64, len + 2));
     });
   }
   return widths.map((w) => ({ wch: w }));
 }
 
-const fact = (p: any, k: string) => p?.facts?.[k]?.value ?? '';
-const num = (p: any, k: string) => parseMoney(p?.facts?.[k]?.value);
-
-// Describe every worksheet the workbook will contain (for the on-screen preview).
-export function excelSheetSummary(rawData: any): { name: string; rows: number; note: string }[] {
-  const d = normalize(rawData);
-  const profs = d.section4_profiles || [];
+export function excelSheetSummary(rawData: any): { name: string; note: string }[] {
   return [
-    { name: 'Summary', rows: 8, note: 'Sector totals and counts' },
-    { name: 'Companies', rows: profs.length, note: 'One row per company, all key facts' },
-    { name: 'Financials', rows: profs.length, note: 'Revenue, R&D, income, assets + ratios' },
-    { name: 'Clinical Trials', rows: profs.reduce((s, p) => s + (p.pipeline?.length || 0), 0), note: 'Every trial program by company' },
-    { name: 'UNC Alignment', rows: profs.reduce((s, p) => s + (p.unc_alignment?.length || 0), 0), note: 'Company-to-UNC research overlaps' },
-    { name: 'Known Partnerships', rows: (d.section2_internal_mapping.known_partnerships || []).length, note: 'Existing UNC partnerships' },
-    { name: 'UNC Faculty', rows: (d.section2_internal_mapping.unc_faculty || []).length, note: 'Faculty with sector expertise' },
-    { name: 'Analytics', rows: 12, note: 'Rankings, averages, ratios' },
-    { name: 'References', rows: (d.references || []).length, note: 'AMA citation list' },
+    { name: 'Summary', note: 'Sector totals, counts, and key statistics' },
+    { name: 'Company Master', note: 'One row per company, all attributes' },
+    { name: 'Financials', note: 'Revenue, R&D, net income, assets, employees' },
+    { name: 'Financial Ratios', note: 'R&D intensity, net margin, ROA, per-employee, asset turnover' },
+    { name: 'Rankings', note: 'Leaders by revenue, R&D intensity, margin, trials, alignment' },
+    { name: 'Partnership Priority', note: 'Outreach-priority score and its components' },
+    { name: 'UNC Engagement', note: 'Ties, alignment signals, trials, alumni' },
+    { name: 'Distributions', note: 'Counts by type, tie, NC, revenue band' },
+    { name: 'Sector Analytics', note: 'Totals, averages, medians, aggregate ratios' },
+    { name: 'Clinical Trials', note: 'Every trial program by company' },
+    { name: 'UNC Alignment', note: 'Company-to-UNC research overlaps' },
+    { name: 'Known Partnerships', note: 'Existing UNC partnerships' },
+    { name: 'UNC Faculty', note: 'Faculty with sector expertise' },
+    { name: 'References', note: 'AMA citation list' },
   ];
 }
 
 export async function downloadExcel(rawData: any) {
   const XLSX = await import('xlsx');
   const d = normalize(rawData);
-  const profs = d.section4_profiles || [];
-  const m = d.report_meta;
+  const a = computeAnalytics(rawData);
   const wb = XLSX.utils.book_new();
-
   const add = (name: string, rows: Row[]) => {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = autoCols(rows);
     XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
   };
 
-  // ── Summary ──
-  const tied = profs.filter((p) => p.existing_unc_tie).length;
-  const strategic = profs.filter((p) => p.partnership_type === 'Strategic').length;
-  const ncBased = profs.filter((p) => p.nc_based).length;
-  const totalTrials = profs.reduce((s, p) => s + (p.pipeline?.length || 0), 0);
-  const totalAlign = profs.reduce((s, p) => s + (p.unc_alignment?.length || 0), 0);
+  // 1. Summary
   add('Summary', [
     ['map · Partnership Intelligence'],
-    ['Sector', m.sector],
-    ['Generated', m.generated_at || m.date || ''],
+    ['Sector', a.sector],
+    ['Generated', d.report_meta.generated_at || d.report_meta.date || ''],
     ['Company selection', d._meta?.resolution || ''],
     [],
     ['Metric', 'Value'],
-    ['Companies reviewed', profs.length],
-    ['Documented UNC tie', tied],
-    ['Strategic scale', strategic],
-    ['NC-based', ncBased],
-    ['Trial programs', totalTrials],
-    ['UNC alignment signals', totalAlign],
+    ['Companies reviewed', a.counts.total],
+    ['Public (with SEC financials)', a.counts.publicWithFinancials],
+    ['Documented UNC tie', a.counts.uncTie],
+    ['Strategic scale', a.counts.strategic],
+    ['NC-based', a.counts.ncBased],
+    ['Combined revenue (USD)', a.totals.revenue || null],
+    ['Combined R&D (USD)', a.totals.rd || null],
+    ['Aggregate R&D % of revenue', a.aggregate.rdIntensity],
+    ['Aggregate net margin %', a.aggregate.netMargin],
+    ['Total trial programs', a.totals.trials],
+    ['Total UNC alignment signals', a.totals.alignment],
     ['Claims double-sourced', d._validation ? `${d._validation.verified}/${d._validation.total_claims}` : ''],
   ]);
 
-  // ── Companies ──
-  const compHead = ['Company', 'Sector (SIC)', 'NC-based', 'Partnership type', 'Existing UNC tie',
-    'Ticker', 'CIK', 'HQ', 'Revenue', 'R&D', 'Net income', 'Total assets', 'Employees',
-    'Trial programs', 'UNC alignment signals', 'UNC alumni found'];
-  add('Companies', [compHead, ...profs.map((p) => [
-    p.company_name, p.sector_tag || '', p.nc_based ? 'Yes' : 'No', p.partnership_type,
-    p.existing_unc_tie ? 'Yes' : 'No',
-    fact(p, 'ticker'), fact(p, 'cik'), fact(p, 'hq'),
-    fact(p, 'revenue'), fact(p, 'rd_expense'), fact(p, 'net_income'), fact(p, 'total_assets'), fact(p, 'employees'),
-    p.pipeline?.length || 0, p.unc_alignment?.length || 0, p.unc_alumni?.length || 0,
-  ])]);
+  // 2. Company Master
+  add('Company Master', [
+    ['Company', 'Ticker', 'Sector (SIC)', 'HQ', 'NC-based', 'Partnership type', 'Existing UNC tie',
+      'Trials', 'Alignment', 'Partners', 'Signals', 'Alumni', 'Priority'],
+    ...a.companies.map((c) => [c.name, c.ticker, c.sic, c.hq, c.ncBased ? 'Yes' : 'No', c.partnershipType,
+      c.uncTie ? 'Yes' : 'No', c.trials, c.alignment, c.partners, c.signals, c.alumni, c.priority]),
+  ]);
 
-  // ── Financials (raw numbers + ratios) ──
-  const finHead = ['Company', 'Revenue (USD)', 'R&D (USD)', 'Net income (USD)', 'Total assets (USD)',
-    'R&D % of revenue', 'Net margin %'];
-  add('Financials', [finHead, ...profs.map((p) => {
-    const rev = num(p, 'revenue'), rd = num(p, 'rd_expense'), ni = num(p, 'net_income'), ta = num(p, 'total_assets');
-    return [
-      p.company_name, rev || null, rd || null, ni || null, ta || null,
-      rev ? +(100 * rd / rev).toFixed(1) : null,
-      rev ? +(100 * ni / rev).toFixed(1) : null,
-    ];
-  })]);
+  // 3. Financials (raw numbers so Excel can chart/compute)
+  add('Financials', [
+    ['Company', 'Revenue (USD)', 'R&D (USD)', 'Net income (USD)', 'Total assets (USD)', 'Employees'],
+    ...a.companies.map((c) => [c.name, c.revenue || null, c.rd || null, c.netIncome || null, c.assets || null, c.employees || null]),
+  ]);
 
-  // ── Clinical Trials ──
+  // 4. Financial Ratios
+  add('Financial Ratios', [
+    ['Company', 'R&D % of revenue', 'Net margin %', 'Return on assets %', 'Revenue / employee (USD)', 'R&D / employee (USD)', 'Asset turnover'],
+    ...a.companies.map((c) => [c.name, c.rdIntensity, c.netMargin, c.roa, c.revPerEmp, c.rdPerEmp, c.assetTurnover]),
+  ]);
+
+  // 5. Rankings (parallel top-10 columns)
+  const rk = a.rankings;
+  const maxLen = Math.max(rk.revenue.length, rk.rdIntensity.length, rk.netMargin.length, rk.trials.length, rk.alignment.length);
+  const rankRows: Row[] = [[
+    'By revenue', '', 'By R&D intensity %', '', 'By net margin %', '', 'By trial programs', '', 'By alignment', '',
+  ]];
+  for (let i = 0; i < maxLen; i++) {
+    rankRows.push([
+      rk.revenue[i]?.name || '', rk.revenue[i] ? Math.round(rk.revenue[i].value) : '',
+      rk.rdIntensity[i]?.name || '', rk.rdIntensity[i]?.value ?? '',
+      rk.netMargin[i]?.name || '', rk.netMargin[i]?.value ?? '',
+      rk.trials[i]?.name || '', rk.trials[i]?.value ?? '',
+      rk.alignment[i]?.name || '', rk.alignment[i]?.value ?? '',
+    ]);
+  }
+  add('Rankings', rankRows);
+
+  // 6. Partnership Priority (sorted, with components)
+  const byPriority = [...a.companies].sort((x, y) => y.priority - x.priority);
+  add('Partnership Priority', [
+    ['Rank', 'Company', 'Priority (0-100)', 'Existing tie (+40)', 'Alignment (+5 ea, cap 25)', 'NC-based (+15)', 'Strategic (+10)', 'Has trials (+10)'],
+    ...byPriority.map((c, i) => [i + 1, c.name, c.priority,
+      c.uncTie ? 40 : 0, Math.min(25, c.alignment * 5), c.ncBased ? 15 : 0,
+      c.partnershipType === 'Strategic' ? 10 : 0, c.trials > 0 ? 10 : 0]),
+  ]);
+
+  // 7. UNC Engagement
+  add('UNC Engagement', [
+    ['Company', 'Existing tie', 'Alignment signals', 'Trial programs', 'UNC alumni found', 'Priority'],
+    ...a.companies.map((c) => [c.name, c.uncTie ? 'Yes' : 'No', c.alignment, c.trials, c.alumni, c.priority]),
+  ]);
+
+  // 8. Distributions
+  const distBlock = (title: string, dist: { label: string; value: number }[]): Row[] =>
+    [[title, ''], ...dist.map((x) => [x.label, x.value]), []];
+  add('Distributions', [
+    ['Distribution', 'Count'],
+    [],
+    ...distBlock('By partnership type', a.distributions.byType),
+    ...distBlock('By UNC tie', a.distributions.byTie),
+    ...distBlock('By NC presence', a.distributions.byNc),
+    ...distBlock('By revenue band', a.distributions.byRevenueBucket),
+  ]);
+
+  // 9. Sector Analytics
+  add('Sector Analytics', [
+    ['Statistic', 'Value'],
+    ['Companies', a.counts.total],
+    ['Public with financials', a.counts.publicWithFinancials],
+    ['Combined revenue (USD)', a.totals.revenue || null],
+    ['Combined R&D (USD)', a.totals.rd || null],
+    ['Combined net income (USD)', a.totals.netIncome || null],
+    ['Combined total assets (USD)', a.totals.assets || null],
+    ['Total employees', a.totals.employees || null],
+    ['Average revenue (USD)', a.averages.revenue],
+    ['Median revenue (USD)', a.medians.revenue],
+    ['Average R&D intensity %', a.averages.rdIntensity],
+    ['Median R&D intensity %', a.medians.rdIntensity],
+    ['Aggregate R&D intensity %', a.aggregate.rdIntensity],
+    ['Average net margin %', a.averages.netMargin],
+    ['Median net margin %', a.medians.netMargin],
+    ['Aggregate net margin %', a.aggregate.netMargin],
+    ['Aggregate ROA %', a.aggregate.roa],
+    ['Total trial programs', a.totals.trials],
+    ['Total alignment signals', a.totals.alignment],
+    ['Share with UNC tie %', a.counts.total ? Math.round(100 * a.counts.uncTie / a.counts.total) : null],
+    ['Share NC-based %', a.counts.total ? Math.round(100 * a.counts.ncBased / a.counts.total) : null],
+  ]);
+
+  // 10-14. Detail sheets from the report
+  const profs = d.section4_profiles || [];
   const trialRows: Row[] = [['Company', 'Program', 'Stage']];
   profs.forEach((p) => (p.pipeline || []).forEach((t) => trialRows.push([p.company_name, t.program, t.stage])));
   add('Clinical Trials', trialRows);
 
-  // ── UNC Alignment ──
   const alignRows: Row[] = [['Company', 'Company program', 'UNC unit', 'UNC fact', 'Why it matters']];
-  profs.forEach((p) => (p.unc_alignment || []).forEach((a) =>
-    alignRows.push([p.company_name, a.company_program, a.unc_unit, a.unc_fact, a.rationale])));
+  profs.forEach((p) => (p.unc_alignment || []).forEach((x) => alignRows.push([p.company_name, x.company_program, x.unc_unit, x.unc_fact, x.rationale])));
   add('UNC Alignment', alignRows);
 
-  // ── Known Partnerships ──
   const kp = d.section2_internal_mapping.known_partnerships || [];
-  add('Known Partnerships', [['Company', 'UNC unit', 'Type', 'Active?'],
-    ...kp.map((p) => [p.company, p.unc_unit, p.relationship_type, p.active])]);
+  add('Known Partnerships', [['Company', 'UNC unit', 'Type', 'Active?'], ...kp.map((p) => [p.company, p.unc_unit, p.relationship_type, p.active])]);
 
-  // ── UNC Faculty ──
   const fac = d.section2_internal_mapping.unc_faculty || [];
-  add('UNC Faculty', [['Name', 'School', 'Research focus'],
-    ...fac.map((f) => [f.name, f.school, f.research_focus])]);
+  add('UNC Faculty', [['Name', 'School', 'Research focus'], ...fac.map((f) => [f.name, f.school, f.research_focus])]);
 
-  // ── Analytics ──
-  const withRev = profs.map((p) => ({ name: p.company_name, rev: num(p, 'revenue'), rd: num(p, 'rd_expense') }))
-    .filter((x) => x.rev > 0);
-  const sumRev = withRev.reduce((s, x) => s + x.rev, 0);
-  const sumRd = withRev.reduce((s, x) => s + x.rd, 0);
-  const topRev = [...withRev].sort((a, b) => b.rev - a.rev)[0];
-  const topRd = [...withRev].sort((a, b) => b.rd - a.rd)[0];
-  const mostTrials = [...profs].sort((a, b) => (b.pipeline?.length || 0) - (a.pipeline?.length || 0))[0];
-  const mostAlign = [...profs].sort((a, b) => (b.unc_alignment?.length || 0) - (a.unc_alignment?.length || 0))[0];
-  add('Analytics', [
-    ['Metric', 'Value'],
-    ['Public companies (with SEC financials)', withRev.length],
-    ['Combined revenue (USD)', sumRev || null],
-    ['Combined R&D (USD)', sumRd || null],
-    ['Average revenue (USD)', withRev.length ? Math.round(sumRev / withRev.length) : null],
-    ['Aggregate R&D % of revenue', sumRev ? +(100 * sumRd / sumRev).toFixed(1) : null],
-    ['Highest revenue', topRev ? `${topRev.name} (${topRev.rev.toLocaleString()})` : ''],
-    ['Highest R&D', topRd ? `${topRd.name} (${topRd.rd.toLocaleString()})` : ''],
-    ['Most trial programs', mostTrials ? `${mostTrials.company_name} (${mostTrials.pipeline?.length || 0})` : ''],
-    ['Most UNC alignment signals', mostAlign ? `${mostAlign.company_name} (${mostAlign.unc_alignment?.length || 0})` : ''],
-    ['Share with documented UNC tie', profs.length ? `${Math.round(100 * tied / profs.length)}%` : ''],
-    ['Share NC-based', profs.length ? `${Math.round(100 * ncBased / profs.length)}%` : ''],
-  ]);
-
-  // ── References ──
-  add('References', [['#', 'Citation', 'URL'],
-    ...(d.references || []).map((r: any) => [r.id, `${r.publisher || ''} ${r.title || ''}`.trim(), r.url])]);
+  add('References', [['#', 'Citation', 'URL'], ...(d.references || []).map((r: any) => [r.id, `${r.publisher || ''} ${r.title || ''}`.trim(), r.url])]);
 
   XLSX.writeFile(wb, `${reportFilename(rawData)}.xlsx`);
 }
