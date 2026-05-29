@@ -5,78 +5,106 @@ SAME sector for company selection and for definition / NC context / UNC units.
 """
 from typing import List, Optional
 
-# Canonical sector key → top-10 companies per sector.
+# Canonical sector key → top-15 companies per sector.
+# 15 seeds give the orchestrator enough candidates to surface the 10 most
+# data-rich companies for a full report even when 1–2 firms are private or
+# return sparse SEC/trials data within the fetch budget.
 SECTOR_SEEDS = {
     # ── Life sciences / health ────────────────────────────────────────────
     "oncology": ["Merck", "Bristol-Myers Squibb", "Pfizer", "Eli Lilly", "AstraZeneca",
-                 "Roche", "Novartis", "Johnson & Johnson", "Regeneron", "Incyte"],
+                 "Roche", "Novartis", "Johnson & Johnson", "Regeneron", "Incyte",
+                 "Amgen", "Gilead Sciences", "AbbVie", "Sanofi", "Blueprint Medicines"],
     "biotech": ["Moderna", "Vertex Pharmaceuticals", "Regeneron", "BioMarin", "Alnylam",
-                "Biogen", "Gilead Sciences", "Amgen", "Seagen", "Neurocrine Biosciences"],
+                "Biogen", "Gilead Sciences", "Amgen", "Neurocrine Biosciences", "Karuna Therapeutics",
+                "CRISPR Therapeutics", "Beam Therapeutics", "Intellia Therapeutics", "Recursion Pharmaceuticals", "Arctus Biotherapeutics"],
     "pharmaceutical": ["Johnson & Johnson", "Pfizer", "Merck", "Eli Lilly", "AbbVie",
-                       "Bristol-Myers Squibb", "AstraZeneca", "Novartis", "Roche", "GSK"],
+                       "Bristol-Myers Squibb", "AstraZeneca", "Novartis", "Roche", "GSK",
+                       "Sanofi", "Amgen", "Gilead Sciences", "Takeda Pharmaceutical", "Biogen"],
     "ag-bio": ["Corteva", "Bayer", "Syngenta", "Ginkgo Bioworks", "Pivot Bio",
-               "Nutrien", "CF Industries", "Mosaic", "FMC Corporation", "American Vanguard"],
+               "Nutrien", "CF Industries", "Mosaic", "FMC Corporation", "American Vanguard",
+               "Scotts Miracle-Gro", "ICL Group", "Balchem Corporation", "Innospec", "Cabot Corporation"],
     "medtech": ["Medtronic", "Boston Scientific", "Stryker", "Abbott Laboratories", "Edwards Lifesciences",
-                "Becton Dickinson", "Zimmer Biomet", "Intuitive Surgical", "ResMed", "Hologic"],
-    "rural health": ["Teladoc Health", "Doximity", "HCA Healthcare", "American Well", "Hims & Hers Health",
-                     "LifePoint Health", "Community Health Systems", "Encompass Health", "Acadia Healthcare", "Tenet Healthcare"],
+                "Becton Dickinson", "Zimmer Biomet", "Intuitive Surgical", "ResMed", "Hologic",
+                "Align Technology", "DexCom", "Insulet Corporation", "Haemonetics", "Merit Medical Systems"],
+    "rural health": ["Teladoc Health", "Doximity", "HCA Healthcare", "Hims & Hers Health",
+                     "LifePoint Health", "Community Health Systems", "Encompass Health", "Acadia Healthcare",
+                     "Tenet Healthcare", "Option Care Health",
+                     "Amedisys", "LHC Group", "National HealthCare Corporation", "Privia Health", "Accolade"],
     # Broad "healthcare" umbrella — deliberately diversified across payers,
-    # pharma, medical devices, pharmacy/health services, and hospital systems
-    # so a generic "healthcare" search returns the marquee players across the
-    # whole sector, not just pharma.
+    # pharma, medical devices, pharmacy/health services, and hospital systems.
     "healthcare": ["UnitedHealth Group", "Johnson & Johnson", "Pfizer", "Eli Lilly", "Merck",
-                   "Abbott Laboratories", "CVS Health", "Cigna", "Elevance Health", "HCA Healthcare"],
+                   "Abbott Laboratories", "CVS Health", "Cigna", "Elevance Health", "HCA Healthcare",
+                   "Humana", "Molina Healthcare", "Centene Corporation", "Tenet Healthcare", "DaVita"],
     # Electronic health records / health IT. Epic Systems and Meditech are private
-    # (no SEC filings), so this curated set covers the public, sourceable EHR and
-    # health-IT vendors. A search for "Epic" or "EHR" routes here.
+    # (no SEC filings), so this curated set covers public, sourceable vendors.
     "health it": ["Oracle", "Veeva Systems", "Doximity", "Health Catalyst", "Evolent Health",
-                  "Phreesia", "Definitive Healthcare", "Computer Programs and Systems", "Teladoc Health", "Premier"],
+                  "Phreesia", "Definitive Healthcare", "Computer Programs and Systems", "Teladoc Health", "Premier",
+                  "Inovalon Holdings", "Consensus Cloud Solutions", "Alignment Healthcare", "Accolade", "Privia Health"],
     # ── Technology ────────────────────────────────────────────────────────
+    # FAANG + major public tech: Meta (Facebook), Apple, Amazon, Netflix,
+    # Alphabet (Google) plus Microsoft, NVIDIA, and top hardware/enterprise players.
     "technology": ["Apple", "Microsoft", "NVIDIA", "Alphabet", "Meta Platforms",
-                   "Amazon", "Samsung", "Intel", "IBM", "Oracle"],
+                   "Amazon", "Netflix", "Intel", "IBM", "Oracle",
+                   "Cisco Systems", "Qualcomm", "Broadcom", "Advanced Micro Devices", "Salesforce"],
     "software": ["Microsoft", "Salesforce", "Adobe", "ServiceNow", "Snowflake",
-                 "Workday", "Intuit", "Autodesk", "Palantir Technologies", "Veeva Systems"],
+                 "Workday", "Intuit", "Autodesk", "Palantir Technologies", "Veeva Systems",
+                 "Zoom Video Communications", "HubSpot", "Datadog", "MongoDB", "Atlassian"],
     # Public, SEC-filing AI leaders only — private labs (OpenAI, Anthropic, xAI)
-    # don't file with the SEC, so they can't be sourced from free public filings
-    # and would render as empty/inaccurate profiles. We cover the public AI value
-    # chain instead: chips, hyperscalers, model platforms, and AI software.
+    # don't file with the SEC, so they can't be sourced from free public filings.
     "artificial intelligence": ["NVIDIA", "Microsoft", "Alphabet", "Amazon", "Meta Platforms",
                                  "Palantir Technologies", "Advanced Micro Devices", "Broadcom",
-                                 "Oracle", "C3.ai"],
+                                 "Oracle", "C3.ai",
+                                 "Snowflake", "Salesforce", "IBM", "Intel", "Cisco Systems"],
     "semiconductors": ["NVIDIA", "Advanced Micro Devices", "Intel", "Broadcom", "Qualcomm",
-                       "Texas Instruments", "Micron Technology", "Applied Materials", "Lam Research", "TSMC"],
+                       "Texas Instruments", "Micron Technology", "Applied Materials", "Lam Research", "TSMC",
+                       "Marvell Technology", "Analog Devices", "NXP Semiconductors", "ON Semiconductor", "Skyworks Solutions"],
     "cybersecurity": ["CrowdStrike", "Palo Alto Networks", "Fortinet", "Zscaler", "Okta",
-                      "SentinelOne", "Tenable Holdings", "CyberArk Software", "Varonis Systems", "Rapid7"],
+                      "SentinelOne", "Tenable Holdings", "CyberArk Software", "Varonis Systems", "Rapid7",
+                      "Cloudflare", "Check Point Software", "Qualys", "Darktrace", "Rubrik"],
     "cloud computing": ["Amazon", "Microsoft", "Alphabet", "Oracle", "Snowflake",
-                        "Salesforce", "IBM", "VMware", "Cloudflare", "DigitalOcean"],
+                        "Salesforce", "IBM", "Cloudflare", "DigitalOcean", "Akamai Technologies",
+                        "MongoDB", "HashiCorp", "Fastly", "Rackspace Technology", "Nutanix"],
     "fintech": ["Visa", "Mastercard", "PayPal", "Block", "Fiserv",
-                "Stripe", "Adyen", "Affirm Holdings", "Marqeta", "SoFi Technologies"],
+                "Adyen", "Affirm Holdings", "Marqeta", "SoFi Technologies", "Global Payments",
+                "Flywire Corporation", "Green Dot Corporation", "Nuvei Corporation", "Repay Holdings", "Payoneer Global"],
     "quantum computing": ["IBM", "IonQ", "Rigetti Computing", "D-Wave Quantum", "Microsoft",
-                          "Honeywell International", "Alphabet", "Intel", "PsiQuantum", "Quantinuum"],
+                          "Honeywell International", "Alphabet", "Intel", "Amazon", "NVIDIA",
+                          "Leidos Holdings", "Booz Allen Hamilton", "Raytheon Technologies", "SAIC", "Northrop Grumman"],
     "robotics": ["Intuitive Surgical", "Rockwell Automation", "Teradyne", "Zebra Technologies", "Symbotic",
-                 "ABB", "Fanuc", "KUKA", "iRobot", "Boston Dynamics"],
+                 "ABB", "Cognex", "Roper Technologies", "Applied Industrial Technologies", "Watts Water Technologies",
+                 "Keyence", "Yaskawa Electric", "Omron", "Brooks Automation", "Onto Innovation"],
     "telecom": ["Verizon", "AT&T", "T-Mobile US", "Cisco Systems", "Comcast",
-                "Charter Communications", "Lumen Technologies", "Crown Castle", "American Tower", "Qualcomm"],
+                "Charter Communications", "Lumen Technologies", "Crown Castle", "American Tower", "Qualcomm",
+                "DISH Network", "Telephone and Data Systems", "SBA Communications", "Calix", "Ribbon Communications"],
     # ── Energy / climate / mobility ───────────────────────────────────────
     "climate tech": ["Tesla", "First Solar", "Enphase Energy", "Plug Power", "Bloom Energy",
-                     "SunPower", "Array Technologies", "Sunrun", "Sunnova Energy", "Stem"],
+                     "Array Technologies", "Sunrun", "Sunnova Energy", "Stem", "Fluence Energy",
+                     "Shoals Technologies", "Altus Power", "TPI Composites", "Clearway Energy", "Pattern Energy"],
     "energy": ["NextEra Energy", "First Solar", "Enphase Energy", "Bloom Energy", "Plug Power",
-               "ExxonMobil", "Chevron", "ConocoPhillips", "Schlumberger", "Halliburton"],
+               "ExxonMobil", "Chevron", "ConocoPhillips", "Schlumberger", "Halliburton",
+               "Duke Energy", "Southern Company", "Dominion Energy", "Entergy", "Consolidated Edison"],
     "automotive": ["Tesla", "General Motors", "Ford Motor", "Rivian Automotive", "Lucid Group",
-                   "Toyota", "Volkswagen", "Stellantis", "Fisker", "NIO"],
+                   "Toyota", "Volkswagen", "Stellantis", "NIO", "Li Auto",
+                   "Aptiv", "BorgWarner", "Lear Corporation", "Modine Manufacturing", "Dorman Products"],
     "aerospace": ["Boeing", "Lockheed Martin", "RTX", "Northrop Grumman", "General Dynamics",
-                  "L3Harris Technologies", "Textron", "Leidos Holdings", "HEICO", "TransDigm Group"],
+                  "L3Harris Technologies", "Textron", "Leidos Holdings", "HEICO", "TransDigm Group",
+                  "Spirit AeroSystems", "Moog", "Mercury Systems", "Curtiss-Wright", "Ducommun"],
     # ── Consumer / industrial / finance ───────────────────────────────────
     "consumer": ["Procter & Gamble", "Coca-Cola", "PepsiCo", "Nike", "Costco Wholesale",
-                 "Unilever", "Colgate-Palmolive", "Kimberly-Clark", "Estee Lauder", "Church & Dwight"],
+                 "Unilever", "Colgate-Palmolive", "Kimberly-Clark", "Estee Lauder", "Church & Dwight",
+                 "Clorox", "Hershey", "General Mills", "Hasbro", "Mattel"],
     "retail": ["Walmart", "Amazon", "Costco Wholesale", "Target", "Home Depot",
-               "Lowe's", "Kroger", "TJX Companies", "Dollar General", "Best Buy"],
+               "Lowe's", "Kroger", "TJX Companies", "Dollar General", "Best Buy",
+               "Dollar Tree", "Walgreens Boots Alliance", "Macy's", "Ross Stores", "Gap"],
     "finance": ["JPMorgan Chase", "Bank of America", "Goldman Sachs", "Morgan Stanley", "BlackRock",
-                "Wells Fargo", "Citigroup", "Charles Schwab", "American Express", "Berkshire Hathaway"],
+                "Wells Fargo", "Citigroup", "Charles Schwab", "American Express", "Berkshire Hathaway",
+                "U.S. Bancorp", "PNC Financial Services", "State Street", "T. Rowe Price", "Raymond James Financial"],
     "insurance": ["Berkshire Hathaway", "Progressive", "Allstate", "Travelers", "Chubb",
-                  "MetLife", "Prudential Financial", "American International Group", "Aflac", "Marsh & McLennan"],
+                  "MetLife", "Prudential Financial", "American International Group", "Aflac", "Marsh & McLennan",
+                  "Unum Group", "Principal Financial Group", "Lincoln National", "Sun Life Financial", "Reinsurance Group of America"],
     "industrial": ["Caterpillar", "Honeywell International", "General Electric", "3M", "Emerson Electric",
-                   "Parker Hannifin", "Eaton", "Illinois Tool Works", "Deere & Company", "Cummins"],
+                   "Parker Hannifin", "Eaton", "Illinois Tool Works", "Deere & Company", "Cummins",
+                   "Rockwell Automation", "Dover Corporation", "Xylem", "IDEX Corporation", "Watts Water Technologies"],
 }
 
 # Broad domain per sector — used to pick which UNC datasets / talent programs

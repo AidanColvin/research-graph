@@ -84,7 +84,7 @@ async def run_pipeline(req: PipelineRequest):
         # 1. Real data collection per company — runs all sources in parallel
         # for up to 10 candidate companies within the Vercel 60s budget.
         company_data = _fetch_all_concurrent(
-            seeds[:10], sec=sec, trials=trials, pubmed=pubmed, nih=nih
+            seeds[:15], sec=sec, trials=trials, pubmed=pubmed, nih=nih
         )
 
         # 2. Deterministic synthesis

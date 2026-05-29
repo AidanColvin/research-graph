@@ -47,7 +47,7 @@ class ReportBuilder:
         s1 = self._section1(ctx, sector, companies)
         s2 = self._section2(sector, companies)
         s3 = self._section3(companies)
-        s4 = [self._profile(c, ctx) for c in companies[:5]]
+        s4 = [self._profile(c, ctx) for c in companies[:10]]
         s5 = self._section5(sector, companies)
         s6 = self._section6(companies)
         report = {
@@ -332,7 +332,7 @@ class ReportBuilder:
 
     def _section3(self, companies: List[dict]) -> dict:
         selected = []
-        for c in companies[:5]:
+        for c in companies[:10]:
             facts = c.get("facts", {}) or {}
             tie = "Yes" if c.get("pubmed") else "Unknown"
             selected.append({
