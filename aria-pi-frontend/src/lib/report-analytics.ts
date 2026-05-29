@@ -35,6 +35,7 @@ export type Analytics = {
   priorityTiers: { high: number; medium: number; low: number; avg: number };
   segments: Segment[];
   crosstab: { tieStrategic: number; tieTranslational: number; noTieStrategic: number; noTieTranslational: number };
+  correlationMatrix: { labels: string[]; matrix: (number | null)[][] };
   bestFit: CompanyMetrics[];
   distributions: { byType: Dist; byTie: Dist; byNc: Dist; byRevenueBucket: Dist; byPriorityTier: Dist };
   rankings: {
@@ -216,6 +217,24 @@ export function computeAnalytics(rawData: any): Analytics {
     noTieTranslational: companies.filter((c) => !c.uncTie && c.partnershipType !== 'Strategic').length,
   };
 
+  // Correlation matrix across financial metrics (for the heatmap viz)
+  const metricDefs: { label: string; get: (c: CompanyMetrics) => number | null }[] = [
+    { label: 'Revenue', get: (c) => (c.revenue > 0 ? c.revenue : null) },
+    { label: 'R&D', get: (c) => (c.rd > 0 ? c.rd : null) },
+    { label: 'Net income', get: (c) => (c.netMargin != null ? c.netIncome : null) },
+    { label: 'R&D %', get: (c) => c.rdIntensity },
+    { label: 'Margin %', get: (c) => c.netMargin },
+    { label: 'ROA %', get: (c) => c.roa },
+  ];
+  const correlationMatrix = {
+    labels: metricDefs.map((m) => m.label),
+    matrix: metricDefs.map((mi, i) => metricDefs.map((mj, j) => {
+      if (i === j) return 1;
+      const pairs = companies.map((c) => [mi.get(c), mj.get(c)]).filter(([x, y]) => x != null && y != null) as [number, number][];
+      return pearson(pairs);
+    })),
+  };
+
   const bestFit = companies.filter((c) => c.uncTie && (c.partnershipType === 'Strategic' || c.alignment > 0)).sort((a, b) => b.priority - a.priority);
 
   const countBy = (fn: (c: CompanyMetrics) => string): Dist => {
@@ -262,5 +281,5 @@ export function computeAnalytics(rawData: any): Analytics {
   const ncSeg = segments.find((s) => s.label === 'NC-based');
   if (ncSeg && ncSeg.count) insights.push(`${sector} has ${ncSeg.count} NC-based ${ncSeg.count === 1 ? 'firm' : 'firms'}, averaging ${ncSeg.avgPriority}/100 priority.`);
 
-  return { sector, companies, counts, totals, averages, medians, aggregate, stats, concentration, correlation, profitability, priorityTiers, segments, crosstab, bestFit, distributions, rankings, insights };
+  return { sector, companies, counts, totals, averages, medians, aggregate, stats, concentration, correlation, profitability, priorityTiers, segments, crosstab, correlationMatrix, bestFit, distributions, rankings, insights };
 }
