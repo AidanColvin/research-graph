@@ -59,7 +59,7 @@ class ReportBuilder:
                 # Precise generation time — proves each report is built fresh on
                 # request (never served from a cache or a saved copy).
                 "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-                "prepared_by": "Research Intelligence Team — Innovate Carolina / UNC Chapel Hill",
+                "prepared_by": "map · Research Intelligence",
                 "version": "Draft",
             },
             "section1_overview": s1,
@@ -839,12 +839,13 @@ def _unc_hook(name: str, grants: list, papers: list, coi_papers: list,
                      f"named asset relevant to {name}'s sector and can anchor "
                      f"the first conversation."),
             "sources": (d.get("sources") or
-                        ["https://research.unc.edu", "https://innovate.unc.edu"]),
+                        ["https://research.unc.edu", "https://otc.unc.edu"]),
         }
     return {
-        "text": (f"UNC's Office of the Vice Chancellor for Research and "
-                 f"Innovate Carolina are the partnership points of contact for {name}."),
-        "sources": ["https://research.unc.edu", "https://innovate.unc.edu"],
+        "text": (f"UNC's Office of the Vice Chancellor for Research and the "
+                 f"Office of Technology Commercialization are the partnership "
+                 f"points of contact for {name}."),
+        "sources": ["https://research.unc.edu", "https://otc.unc.edu"],
     }
 
 

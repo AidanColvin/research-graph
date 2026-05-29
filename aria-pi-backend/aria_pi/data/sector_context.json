@@ -525,9 +525,9 @@
         "url": "https://www.kenan-flagler.unc.edu"
       },
       {
-        "unit": "Innovate Carolina",
-        "focus": "UNC's central innovation and entrepreneurship hub coordinating industry partnerships.",
-        "url": "https://innovate.unc.edu"
+        "unit": "UNC Office of Technology Commercialization",
+        "focus": "UNC's technology-transfer office; licenses university IP and coordinates industry research partnerships.",
+        "url": "https://otc.unc.edu"
       }
     ]
   },
@@ -1111,9 +1111,9 @@
         "url": "https://research.unc.edu"
       },
       {
-        "unit": "Innovate Carolina",
-        "focus": "UNC's central innovation and entrepreneurship hub coordinating industry partnerships.",
-        "url": "https://innovate.unc.edu"
+        "unit": "UNC Office of Technology Commercialization",
+        "focus": "UNC's technology-transfer office; licenses university IP and coordinates industry research partnerships.",
+        "url": "https://otc.unc.edu"
       }
     ]
   },

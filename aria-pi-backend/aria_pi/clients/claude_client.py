@@ -63,9 +63,8 @@ class ClaudeClient:
 
 def _system_prompt() -> str:
     return (
-        "You are a research analyst at the UNC Chapel Hill Innovate Carolina "
-        "Research Intelligence Team. You produce partnership intelligence reports "
-        "that inform Bus Dev outreach to industry partners.\n\n"
+        "You are a research analyst producing partnership intelligence reports "
+        "that inform business-development outreach to industry partners.\n\n"
         "STRICT SOURCING RULES — non-negotiable:\n"
         "• Every factual claim must be backed by exactly two independently verifiable sources.\n"
         "• Acceptable source domains: company website, sec.gov, pubmed.ncbi.nlm.nih.gov, "
@@ -107,7 +106,7 @@ def _schema_example() -> str:
   "report_meta": {
     "sector": "string",
     "date": "MM/DD/YYYY",
-    "prepared_by": "Research Intelligence Team — Innovate Carolina / UNC Chapel Hill",
+    "prepared_by": "map · Research Intelligence",
     "version": "Draft"
   },
   "section1_overview": {
@@ -211,7 +210,7 @@ def _stub_report(sector: str, real_data: dict) -> dict:
         "report_meta": {
             "sector": sector,
             "date": today,
-            "prepared_by": "Research Intelligence Team — Innovate Carolina / UNC Chapel Hill",
+            "prepared_by": "map · Research Intelligence",
             "version": "Draft",
         },
         "section1_overview": {
@@ -295,7 +294,7 @@ def _stub_report(sector: str, real_data: dict) -> dict:
             "partnership_models": [
                 {"model": "Sponsored Research Agreement",
                  "description": "Company funds a defined UNC research project.",
-                 "unit": "Innovate Carolina"},
+                 "unit": "UNC Office of Sponsored Research"},
                 {"model": "License / IP Commercialization",
                  "description": "UNC licenses a technology to the company.",
                  "unit": "UNC Office of Technology Commercialization"},
@@ -304,7 +303,7 @@ def _stub_report(sector: str, real_data: dict) -> dict:
                  "unit": "NC TraCS"},
                 {"model": "Fellowship or Internship Placement",
                  "description": "Company hosts a UNC student in a structured program.",
-                 "unit": "Innovate Carolina"},
+                 "unit": "UNC Office of Technology Commercialization"},
                 {"model": "Clinical Research Collaboration",
                  "description": "Company runs a trial through UNC Health.",
                  "unit": "UNC Health / NC TraCS"},

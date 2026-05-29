@@ -666,7 +666,7 @@ export async function downloadPdf(rawData: any) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(160, 160, 160);
-    doc.text(`Innovate Carolina · UNC Chapel Hill`, margin, pageH - 24);
+    doc.text(`map · partnership intelligence`, margin, pageH - 24);
     doc.text(`${i} / ${pages}`, pageW - margin, pageH - 24, { align: 'right' });
   }
 

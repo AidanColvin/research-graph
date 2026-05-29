@@ -334,7 +334,7 @@ export function normalize(raw: any): ReportData {
       sector: d.report_meta?.sector || d.sector || 'n/a',
       date: d.report_meta?.date || '',
       generated_at: d.report_meta?.generated_at || d._meta?.generated_at || '',
-      prepared_by: d.report_meta?.prepared_by || 'Research Intelligence Team, UNC Chapel Hill',
+      prepared_by: d.report_meta?.prepared_by || 'map · Research Intelligence',
       version: d.report_meta?.version || 'Draft',
     },
     section1_overview: {

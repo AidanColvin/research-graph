@@ -356,7 +356,7 @@ export default function Home() {
         </section>
       )}
 
-      <footer style={styles.footer}>Innovate Carolina · UNC Chapel Hill</footer>
+      <footer style={styles.footer}>map · partnership intelligence</footer>
     </main>
   );
 }
