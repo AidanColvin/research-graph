@@ -6,8 +6,10 @@ import Intro from '@/components/Intro';
 
 type Status = 'idle' | 'running' | 'done' | 'error';
 
-// Ten stages × 10 s = 100 s of visible animation, covering the full
-// backend run (22 companies, SEC + Trials + NIH + PubMed + alumni).
+// Labels for the progress lines. These advance on a fixed cosmetic timer
+// (STAGE_MS each) — they don't measure real backend progress. The genuine
+// work runs in parallel and the report only loads once it actually returns;
+// see run() and STAGE_MS below.
 const STAGES = [
   'Sector overview',
   'Company selection',
@@ -31,9 +33,12 @@ const SECTORS = [
   'Finance', 'Insurance', 'Industrial',
 ];
 
-// How long the dot rests on each line as it travels down. The dot must visibly
-// pass every line before the report is allowed to load (see run()).
-const STAGE_MS = 6500;
+// How long the dot rests on each line as it travels down (cosmetic pacing).
+// Kept short — 10 lines × 3s ≈ 30s — so the animation reliably finishes before
+// the slower backend (22 companies) does, adding no artificial wait. Once the
+// dot reaches the last line, it pulses until the real report data arrives, so
+// the total wait equals the genuine backend time, not this timer.
+const STAGE_MS = 3000;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
