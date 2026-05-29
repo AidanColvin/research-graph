@@ -2,6 +2,8 @@
 
 import React, { CSSProperties } from 'react';
 import { downloadMarkdown, downloadPdf, downloadDocx } from '@/lib/report-export';
+import { downloadExcel } from '@/lib/report-excel';
+import { downloadPptx } from '@/lib/report-slides';
 
 type Sourced = { text: string; sources: string[] };
 type SourceList = string[];
@@ -604,7 +606,7 @@ export default function Report({ data: rawInput }: { data: any }) {
   const m = data.report_meta;
   const v = data._validation;
   const citations = React.useMemo(() => buildCitationIndex(data), [data]);
-  const [busy, setBusy] = React.useState<null | 'md' | 'pdf' | 'docx'>(null);
+  const [busy, setBusy] = React.useState<null | 'md' | 'pdf' | 'docx' | 'xlsx' | 'pptx'>(null);
 
   // ── Aggregates for the thesis + visualizations (all from real report data) ──
   const profiles = data.section4_profiles || [];
@@ -641,13 +643,15 @@ export default function Report({ data: rawInput }: { data: any }) {
   const topRd = rdData[0];
   const uncUnits = data.section1_overview.unc_units || [];
 
-  async function handleDownload(kind: 'md' | 'pdf' | 'docx') {
+  async function handleDownload(kind: 'md' | 'pdf' | 'docx' | 'xlsx' | 'pptx') {
     if (busy) return;
     try {
       setBusy(kind);
       if (kind === 'md') downloadMarkdown(rawData);
       else if (kind === 'pdf') await downloadPdf(rawData);
-      else await downloadDocx(rawData);
+      else if (kind === 'docx') await downloadDocx(rawData);
+      else if (kind === 'xlsx') await downloadExcel(rawData);
+      else await downloadPptx(rawData);
     } catch (e) {
       console.error('Download failed:', e);
       alert('Sorry, that download failed. Please try again.');
@@ -670,8 +674,14 @@ export default function Report({ data: rawInput }: { data: any }) {
           <button onClick={() => handleDownload('pdf')} disabled={!!busy} style={styles.dlBtn}>
             {busy === 'pdf' ? 'Building…' : 'PDF'}
           </button>
-          <button onClick={() => handleDownload('docx')} disabled={!!busy} style={styles.dlBtnPrimary}>
-            {busy === 'docx' ? 'Building…' : 'Word (.docx)'}
+          <button onClick={() => handleDownload('docx')} disabled={!!busy} style={styles.dlBtn}>
+            {busy === 'docx' ? 'Building…' : 'Word'}
+          </button>
+          <button onClick={() => handleDownload('xlsx')} disabled={!!busy} style={styles.dlBtn}>
+            {busy === 'xlsx' ? 'Building…' : 'Excel'}
+          </button>
+          <button onClick={() => handleDownload('pptx')} disabled={!!busy} style={styles.dlBtn}>
+            {busy === 'pptx' ? 'Building…' : 'Slides'}
           </button>
         </div>
       </div>
