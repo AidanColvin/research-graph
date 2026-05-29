@@ -6,8 +6,9 @@ import Intro from '@/components/Intro';
 import ExcelView from '@/components/ExcelView';
 import SlidesView from '@/components/SlidesView';
 import VisualsView from '@/components/VisualsView';
+import TrendsView from '@/components/TrendsView';
 
-type View = 'report' | 'excel' | 'slides' | 'visuals';
+type View = 'report' | 'excel' | 'slides' | 'visuals' | 'trends';
 
 // Small brand mark shown next to the wordmark (a node-graph glyph echoing the
 // intro). Swap for an <img src="/logo.svg"> if you add a logo file.
@@ -270,6 +271,7 @@ export default function Home() {
     { key: 'home', label: 'Home' },
     { key: 'report', label: 'Report' },
     { key: 'visuals', label: 'Visualize' },
+    { key: 'trends', label: 'Trends' },
     { key: 'excel', label: 'Excel' },
     { key: 'slides', label: 'Slide Deck' },
   ];
@@ -405,6 +407,7 @@ export default function Home() {
 
       {status === 'done' && data && view === 'report' && <Report data={data} />}
       {status === 'done' && data && view === 'visuals' && <VisualsView data={data} />}
+      {status === 'done' && data && view === 'trends' && <TrendsView data={data} />}
       {status === 'done' && data && view === 'excel' && <ExcelView data={data} />}
       {status === 'done' && data && view === 'slides' && <SlidesView data={data} />}
 

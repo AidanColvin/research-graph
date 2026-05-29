@@ -303,14 +303,32 @@ class SECEdgarClient:
                 return None
             return max(candidates, key=lambda r: r.get("end", ""))
 
-        revenue = most_recent(
-            "Revenues",
-            "RevenueFromContractWithCustomerExcludingAssessedTax",
-            "RevenueFromContractWithCustomerIncludingAssessedTax",
-            "SalesRevenueNet",
-            "SalesRevenueGoodsNet",
-            "SalesRevenueServicesNet",
-        )
+        def annual_series(*concept_names: str, unit: str = "USD", src: dict = us_gaap, years: int = 11) -> list:
+            """Up to `years` of annual (10-K/FY) values, merged across concept
+            names and deduped by fiscal year. Returns [{fy, val}] ascending —
+            the time series used for the on-screen trend charts.
+            """
+            by_fy: dict[int, dict] = {}
+            for name in concept_names:
+                concept = src.get(name) or {}
+                for e in ((concept.get("units") or {}).get(unit) or []):
+                    if e.get("form") != "10-K" or e.get("fp") != "FY":
+                        continue
+                    fy = e.get("fy")
+                    val = e.get("val")
+                    if fy is None or val is None:
+                        continue
+                    # Prefer the later-filed value for a given fiscal year.
+                    prev = by_fy.get(fy)
+                    if prev is None or (e.get("end", "") > prev.get("end", "")):
+                        by_fy[fy] = {"fy": int(fy), "val": val, "end": e.get("end", "")}
+            ordered = sorted(by_fy.values(), key=lambda x: x["fy"])[-years:]
+            return [{"fy": x["fy"], "val": x["val"]} for x in ordered]
+
+        REV_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
+                        "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
+                        "SalesRevenueGoodsNet", "SalesRevenueServicesNet")
+        revenue = most_recent(*REV_CONCEPTS)
         return {
             "revenue": revenue,
             "rd_expense": latest_annual("ResearchAndDevelopmentExpense", "USD"),
@@ -319,6 +337,11 @@ class SECEdgarClient:
             "stockholders_equity": latest_annual("StockholdersEquity", "USD"),
             "employees": latest_annual("EntityNumberOfEmployees", "pure", source=dei),
             "shares_outstanding": latest_annual("EntityCommonStockSharesOutstanding", "shares", source=dei),
+            "series": {
+                "revenue": annual_series(*REV_CONCEPTS),
+                "rd_expense": annual_series("ResearchAndDevelopmentExpense"),
+                "net_income": annual_series("NetIncomeLoss"),
+            },
         }
 
     def get_unc_alumni_from_proxy(self, cik: str, proxy_filings: list) -> list:

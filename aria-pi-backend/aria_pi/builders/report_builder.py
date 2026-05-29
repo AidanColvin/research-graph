@@ -507,10 +507,16 @@ class ReportBuilder:
                 "edgar_url": edgar_url,
             })
 
+        xbrl_series = (facts.get("xbrl") or {}).get("series") or {}
         return {
             "company_name": c["name"],
             "sector_tag": sector_tag,
             "nc_based": nc_based,
+            "trends": {
+                "revenue": xbrl_series.get("revenue") or [],
+                "rd_expense": xbrl_series.get("rd_expense") or [],
+                "net_income": xbrl_series.get("net_income") or [],
+            },
             "overview": {"text": overview_text,
                          "sources": [edgar_url, _first_trial_url(c)]},
             "partnership_type": "Strategic" if len(trials) > 5 else "Translational",

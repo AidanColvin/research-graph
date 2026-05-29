@@ -31,6 +31,7 @@ export type ReportData = {
     company_name: string;
     sector_tag?: string;
     nc_based?: boolean;
+    trends?: { revenue: { fy: number; val: number }[]; rd_expense: { fy: number; val: number }[]; net_income: { fy: number; val: number }[] };
     overview: Sourced;
     partnership_type: string;
     existing_unc_tie: boolean;
@@ -360,6 +361,11 @@ export function normalize(raw: any): ReportData {
       company_name: p?.company_name || 'n/a',
       sector_tag: p?.sector_tag || '',
       nc_based: !!p?.nc_based,
+      trends: {
+        revenue: Array.isArray(p?.trends?.revenue) ? p.trends.revenue : [],
+        rd_expense: Array.isArray(p?.trends?.rd_expense) ? p.trends.rd_expense : [],
+        net_income: Array.isArray(p?.trends?.net_income) ? p.trends.net_income : [],
+      },
       overview: sourced(p?.overview),
       partnership_type: p?.partnership_type || 'Unknown',
       existing_unc_tie: !!p?.existing_unc_tie,
