@@ -3,7 +3,7 @@
 import React from 'react';
 import { fmtUsd } from '@/components/Report';
 import { computeAnalytics, type CompanyMetrics } from '@/lib/report-analytics';
-import { IsoBars, IsoScatter } from '@/components/Chart3D';
+import { IsoScatter, OrbitNetwork } from '@/components/Chart3D';
 
 const INDIGO = '#4f46e5';
 const INK = '#0a0a0a';
@@ -15,15 +15,21 @@ export default function VisualsView({ data: rawData }: { data: any }) {
 
   return (
     <div style={st.wrap}>
-      <div style={st.head}>
-        <div style={st.eyebrow}>Visualizations</div>
-        <h1 style={st.title}>{a.sector} · visual analysis</h1>
+      <ChartDefs />
+      <div style={st.hero}>
+        <div style={st.eyebrow}>Visual analysis</div>
+        <h1 style={st.title}>{a.sector}</h1>
         <p style={st.sub}>
-          A full visual workup of the {a.sector} field, computed from the searched sector&apos;s own
-          companies and figures — positioning, financial structure, concentration, correlation,
-          distribution, benchmarking, ranking, relationship network, and engagement flow.
+          A friendly visual tour of the {a.sector} landscape, built entirely from the companies and
+          figures in your report. See who leads, who fits, and where UNC already connects. Hover any
+          chart to pause or read the detail.
         </p>
       </div>
+
+      <Card title="Connection orbit (3D, rotating)" caption="The whole set orbiting UNC in three dimensions. It rotates continuously, so nodes that would overlap in a flat chart separate as they turn; hover to pause. Indigo spheres have an existing UNC tie, node size is partnership priority, and spoke weight is alignment signals.">
+        <OrbitNetwork centerLabel="UNC"
+          points={cos.map((c) => ({ label: c.name, size: Math.max(0.05, c.priority / 100), highlight: c.uncTie, weight: c.alignment }))} />
+      </Card>
 
       <Card title="Opportunity matrix" caption="Revenue (log) vs partnership priority. Bubble size = trial programs; filled = existing UNC tie. Quadrants split at the medians.">
         <OpportunityMatrix cos={cos} />
@@ -38,9 +44,8 @@ export default function VisualsView({ data: rawData }: { data: any }) {
         />
       </Card>
 
-      <Card title="Revenue (3D)" caption="Latest reported revenue as extruded columns — the sector's heavyweights at a glance.">
-        <IsoBars baseColor="#4f46e5" valueFmt={(v) => fmtUsd(v)}
-          items={cos.filter((c) => c.revenue > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 10).map((c) => ({ label: c.name, value: c.revenue }))} />
+      <Card title="Revenue by company" caption="Latest reported revenue, largest first. Solid indigo bars mark companies with an existing UNC tie.">
+        <RevenueBars cos={cos} />
       </Card>
 
       <Card title="UNC connection network" caption="A relationship diagram: UNC at the center, linked to companies with a documented tie or research overlap. Edge weight = alignment signals; node size = priority.">
@@ -135,13 +140,63 @@ export default function VisualsView({ data: rawData }: { data: any }) {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+// Shared gradient palette, defined once and referenced by url(#id) from any chart.
+function ChartDefs() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden focusable={false}>
+      <defs>
+        <linearGradient id="g-bar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#818cf8" /><stop offset="100%" stopColor="#4f46e5" />
+        </linearGradient>
+        <linearGradient id="g-barH" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#4f46e5" /><stop offset="100%" stopColor="#818cf8" />
+        </linearGradient>
+        <linearGradient id="g-barH-soft" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#c7d2fe" /><stop offset="100%" stopColor="#a5b4fc" />
+        </linearGradient>
+        <linearGradient id="g-ink" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#475569" /><stop offset="100%" stopColor="#1e293b" />
+        </linearGradient>
+        <linearGradient id="g-soft" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#c7d2fe" stopOpacity={0.55} /><stop offset="100%" stopColor="#e0e7ff" stopOpacity={0.1} />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 function Card({ title, caption, children }: { title: string; caption: string; children: React.ReactNode }) {
   return (
     <div style={st.card}>
-      <div style={st.cardTitle}>{title}</div>
+      <div style={st.cardHead}><span style={st.dot} /><div style={st.cardTitle}>{title}</div></div>
       <div style={st.cardCaption}>{caption}</div>
       <div>{children}</div>
     </div>
+  );
+}
+
+// ── Revenue by company (clean 2D bars) ───────────────────────────────────────
+function RevenueBars({ cos }: { cos: CompanyMetrics[] }) {
+  const items = cos.filter((c) => c.revenue > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  if (!items.length) return <Empty />;
+  const W = 820, pl = 156, pr = 84, top = 14, rowH = 38;
+  const H = top + items.length * rowH + 8;
+  const max = items[0].revenue;
+  const Xw = (v: number) => Math.max(3, (v / max) * (W - pl - pr));
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      {items.map((c, i) => {
+        const y = top + i * rowH, bh = rowH - 16;
+        return (
+          <g key={i}>
+            <text x={pl - 12} y={y + rowH / 2 + 1} textAnchor="end" style={st.barLabel}>{c.name}</text>
+            <rect x={pl} y={y + 6} width={W - pl - pr} height={bh} rx={bh / 2} fill="#f1f2f9" />
+            <rect x={pl} y={y + 6} width={Xw(c.revenue)} height={bh} rx={bh / 2} fill={c.uncTie ? 'url(#g-barH)' : 'url(#g-barH-soft)'} />
+            <text x={pl + Xw(c.revenue) + 9} y={y + rowH / 2 + 1} style={st.barVal}>{fmtUsd(c.revenue)}</text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 const lin = (v: number, d0: number, d1: number, r0: number, r1: number) => d1 === d0 ? (r0 + r1) / 2 : r0 + ((v - d0) / (d1 - d0)) * (r1 - r0);
@@ -303,8 +358,8 @@ function Lorenz({ cos, hhi, label }: { cos: CompanyMetrics[]; hhi: number | null
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ ...st.svg, maxWidth: 560 }}>
       <line x1={pl} y1={H - pb} x2={W - pr} y2={pt} stroke="#ccc" strokeDasharray="4 4" />
-      <path d={`${path} L ${X(1)} ${Y(0)} Z`} fill={INDIGO} fillOpacity={0.08} />
-      <path d={path} fill="none" stroke={INDIGO} strokeWidth={2.5} />
+      <path d={`${path} L ${X(1)} ${Y(0)} Z`} fill="url(#g-soft)" />
+      <path d={path} fill="none" stroke={INDIGO} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
       <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#ccc" />
       <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#ccc" />
       <text x={(pl + W - pr) / 2} y={H - 8} textAnchor="middle" style={st.axis}>Cumulative share of companies →</text>
@@ -330,9 +385,9 @@ function GroupedFinancials({ cos }: { cos: CompanyMetrics[] }) {
           return (
             <g key={i}>
               <text x={pl - 8} y={y + groupH / 2 + 2} textAnchor="end" style={st.barLabel}>{c.name}</text>
-              <rect x={pl} y={y + 4} width={Xw(c.revenue)} height={14} fill={INK} />
+              <rect x={pl} y={y + 4} width={Xw(c.revenue)} height={14} rx={4} fill="url(#g-ink)" />
               <text x={pl + Xw(c.revenue) + 5} y={y + 15} style={st.barVal}>{fmtUsd(c.revenue)}</text>
-              <rect x={pl} y={y + 22} width={Xw(c.rd)} height={14} fill={INDIGO} />
+              <rect x={pl} y={y + 22} width={Xw(c.rd)} height={14} rx={4} fill="url(#g-barH)" />
               <text x={pl + Xw(c.rd) + 5} y={y + 33} style={st.barVal}>{fmtUsd(c.rd)}</text>
             </g>
           );
@@ -398,7 +453,7 @@ function Treemap({ cos }: { cos: CompanyMetrics[] }) {
       const rw = (c.revenue / rowVal) * W;
       rects.push(
         <g key={`${ri}-${ci}`}>
-          <rect x={x} y={y} width={rw - 2} height={rh - 2} fill={INDIGO} fillOpacity={Math.max(0.35, 0.9 - (ri + ci) * 0.07)} />
+          <rect x={x} y={y} width={rw - 3} height={rh - 3} rx={8} fill="url(#g-bar)" fillOpacity={Math.max(0.4, 0.95 - (ri + ci) * 0.07)} />
           {rw > 70 && rh > 28 && <><text x={x + 8} y={y + 20} style={st.tmName}>{c.name}</text><text x={x + 8} y={y + 38} style={st.tmVal}>{fmtUsd(c.revenue)}</text></>}
         </g>,
       );
@@ -491,7 +546,7 @@ function DivergingMargin({ cos }: { cos: CompanyMetrics[] }) {
         return (
           <g key={i}>
             <text x={pl - 8} y={y + rowH / 2 + 4} textAnchor="end" style={st.barLabel}>{c.name}</text>
-            <rect x={pos ? mid : mid - w} y={y + 5} width={w} height={rowH - 12} fill={pos ? INK : RED} />
+            <rect x={pos ? mid : mid - w} y={y + 5} width={w} height={rowH - 12} rx={4} fill={pos ? 'url(#g-bar)' : RED} fillOpacity={pos ? 1 : 0.85} />
             <text x={pos ? mid + w + 5 : mid - w - 5} y={y + rowH / 2 + 4} textAnchor={pos ? 'start' : 'end'} style={st.barVal}>{c.netMargin}%</text>
           </g>
         );
@@ -520,7 +575,7 @@ function Histogram({ cos }: { cos: CompanyMetrics[] }) {
         const h = (b.n / maxN) * (H - pt - pb); const x = pl + i * bw;
         return (
           <g key={i}>
-            <rect x={x + 3} y={H - pb - h} width={bw - 6} height={h} fill={INDIGO} fillOpacity={0.85} />
+            <rect x={x + 3} y={H - pb - h} width={bw - 6} height={h} rx={5} fill="url(#g-bar)" />
             {b.n > 0 && <text x={x + bw / 2} y={H - pb - h - 6} textAnchor="middle" style={st.barVal}>{b.n}</text>}
             <text x={x + bw / 2} y={H - pb + 16} textAnchor="middle" style={st.axisSm}>{i === nbins - 1 ? `${b.lo}+%` : `${b.lo}-${b.hi}%`}</text>
           </g>
@@ -611,7 +666,7 @@ function Funnel({ a }: { a: ReturnType<typeof computeAnalytics> }) {
         const w = Math.max(40, (s.value / max) * (W - 40)); const x = (W - w) / 2; const y = pt + i * rowH;
         return (
           <g key={i}>
-            <rect x={x} y={y} width={w} height={rowH - 14} rx={6} fill={INDIGO} fillOpacity={lin(i, 0, stages.length, 0.9, 0.45)} />
+            <rect x={x} y={y} width={w} height={rowH - 14} rx={10} fill="url(#g-bar)" fillOpacity={lin(i, 0, stages.length, 1, 0.5)} />
             <text x={W / 2} y={y + (rowH - 14) / 2 - 2} textAnchor="middle" style={st.funnelVal}>{s.value}</text>
             <text x={W / 2} y={y + (rowH - 14) / 2 + 14} textAnchor="middle" style={st.funnelLbl}>{s.label}</text>
           </g>
@@ -694,12 +749,12 @@ function Pareto({ cos }: { cos: CompanyMetrics[] }) {
         const h = (c.revenue / max) * (H - pt - pb); const x = pl + i * bw;
         return (
           <g key={i}>
-            <rect x={x + 2} y={H - pb - h} width={bw - 4} height={h} fill={INDIGO} fillOpacity={0.8} />
+            <rect x={x + 2} y={H - pb - h} width={bw - 4} height={h} rx={4} fill="url(#g-bar)" />
             <text x={x + bw / 2} y={H - pb + 12} textAnchor="end" style={{ ...st.axisSm }} transform={`rotate(-40 ${x + bw / 2} ${H - pb + 12})`}>{c.name}</text>
           </g>
         );
       })}
-      <polyline points={linePts.map((p) => p.join(',')).join(' ')} fill="none" stroke={INK} strokeWidth={2} />
+      <polyline points={linePts.map((p) => p.join(',')).join(' ')} fill="none" stroke={INK} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {linePts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill={INK} />)}
       <text x={W - pr + 6} y={pt + 6} style={st.axisSm}>100%</text>
     </svg>
@@ -814,7 +869,7 @@ function MarginHistogram({ cos }: { cos: CompanyMetrics[] }) {
         const h = (b.n / maxN) * (H - pt - pb); const x = pl + i * bw;
         return (
           <g key={i}>
-            <rect x={x + 3} y={H - pb - h} width={bw - 6} height={h} fill={b.lo < 0 ? RED : INDIGO} fillOpacity={0.8} />
+            <rect x={x + 3} y={H - pb - h} width={bw - 6} height={h} rx={5} fill={b.lo < 0 ? RED : 'url(#g-bar)'} fillOpacity={b.lo < 0 ? 0.85 : 1} />
             {b.n > 0 && <text x={x + bw / 2} y={H - pb - h - 6} textAnchor="middle" style={st.barVal}>{b.n}</text>}
             <text x={x + bw / 2} y={H - pb + 16} textAnchor="middle" style={st.axisSm}>{Math.round(b.lo)}%</text>
           </g>
@@ -875,11 +930,13 @@ function Sankey({ cos }: { cos: CompanyMetrics[] }) {
 
 const st: Record<string, React.CSSProperties> = {
   wrap: { maxWidth: 1000, margin: '0 auto', padding: '8px 4px 90px' },
-  head: { marginTop: 16, marginBottom: 24 },
-  eyebrow: { fontSize: 11, letterSpacing: '0.22em', color: '#999', textTransform: 'uppercase', marginBottom: 10 },
-  title: { fontSize: 'clamp(26px, 4vw, 38px)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1 },
-  sub: { fontSize: 14.5, color: '#666', marginTop: 12, maxWidth: 720, lineHeight: 1.6 },
-  card: { border: '1px solid #eee', borderRadius: 16, padding: '22px 24px', marginBottom: 20, background: '#fff' },
+  hero: { marginTop: 16, marginBottom: 22, padding: '34px 32px', borderRadius: 24, background: 'linear-gradient(135deg, #eef2ff 0%, #f5f3ff 45%, #ffffff 100%)', border: '1px solid #e7e9f5' },
+  eyebrow: { fontSize: 11, letterSpacing: '0.22em', color: '#6366f1', textTransform: 'uppercase', marginBottom: 10, fontWeight: 600 },
+  title: { fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.05, color: '#0a0a0a' },
+  sub: { fontSize: 15, color: '#555', marginTop: 14, maxWidth: 680, lineHeight: 1.65 },
+  card: { border: '1px solid #eef0f6', borderRadius: 20, padding: '24px 26px', marginBottom: 22, background: '#fff', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 12px 32px -14px rgba(49,46,129,0.12)' },
+  cardHead: { display: 'flex', alignItems: 'center', gap: 9, marginBottom: 2 },
+  dot: { width: 9, height: 9, borderRadius: 3, background: 'linear-gradient(135deg, #818cf8, #4f46e5)', flex: 'none' },
   cardTitle: { fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: '#0a0a0a' },
   cardCaption: { fontSize: 13, color: '#777', marginTop: 6, marginBottom: 16, lineHeight: 1.55, maxWidth: 780 },
   svg: { width: '100%', height: 'auto', display: 'block' },

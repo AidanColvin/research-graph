@@ -110,6 +110,117 @@ export function IsoScatter({ points, xLabel, yLabel, zLabel }: {
   );
 }
 
+// ── Rotating 3D orbital network ───────────────────────────────────────────────
+// Companies sit on a sphere around a central node and rotate continuously, like
+// the logo. Motion + even spherical spacing keep labels from stacking the way a
+// static projection does. Depth controls size, opacity, and which labels show.
+export function OrbitNetwork({ points, centerLabel = 'UNC', height = 580, baseColor = '#4f46e5' }: {
+  points: { label: string; size: number; highlight?: boolean; weight?: number }[];
+  centerLabel?: string;
+  height?: number;
+  baseColor?: string;
+}) {
+  const [angle, setAngle] = React.useState(0);
+  const paused = React.useRef(false);
+
+  React.useEffect(() => {
+    let raf = 0, last = 0;
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+    const tick = (t: number) => {
+      if (last && !paused.current && !reduce) setAngle((a) => (a + (t - last) * 0.00035) % (Math.PI * 2));
+      last = t;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const n = points.length;
+  if (!n) return <div style={empty}>Not enough data for this view.</div>;
+
+  const W = 820, H = height, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.33;
+  const tilt = 0.42, ct = Math.cos(tilt), stt = Math.sin(tilt);
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const GA = Math.PI * (3 - Math.sqrt(5)); // golden angle → even sphere spread
+  const f = 2.6; // camera distance for perspective
+
+  const nodes = points.map((p, i) => {
+    const y0 = n === 1 ? 0 : 1 - (i / (n - 1)) * 2;
+    const rad = Math.sqrt(Math.max(0, 1 - y0 * y0));
+    const th = GA * i;
+    const x0 = Math.cos(th) * rad, z0 = Math.sin(th) * rad;
+    const x1 = x0 * ca + z0 * sa;           // rotate around vertical axis
+    const z1 = -x0 * sa + z0 * ca;
+    const y2 = y0 * ct - z1 * stt;          // tilt toward viewer
+    const z2 = y0 * stt + z1 * ct;
+    const scale = f / (f - z2);
+    return {
+      ...p,
+      sx: cx + x1 * R * scale,
+      sy: cy - y2 * R * scale,
+      z2,
+      depth: (z2 + 1) / 2,                  // 0 back → 1 front
+      scale,
+    };
+  }).sort((a, b) => a.z2 - b.z2);
+
+  const renderNode = (nd: typeof nodes[number], i: number) => {
+    const r = Math.max(3, (4.5 + nd.size * 11) * nd.scale);
+    const op = 0.28 + nd.depth * 0.72;
+    const showLabel = nd.depth > 0.52;
+    const right = nd.sx >= cx;
+    const stroke = nd.highlight ? baseColor : '#9aa0c8';
+    return (
+      <g key={i} opacity={op}>
+        <line x1={cx} y1={cy} x2={nd.sx} y2={nd.sy}
+          stroke={nd.highlight ? baseColor : '#c8cbe0'}
+          strokeWidth={0.6 + (nd.weight || 0) * 0.5}
+          strokeOpacity={0.1 + nd.depth * 0.45} />
+        <circle cx={nd.sx} cy={nd.sy} r={r}
+          fill={nd.highlight ? 'url(#orb-hi)' : 'url(#orb-lo)'}
+          stroke={stroke} strokeWidth={1} />
+        <circle cx={nd.sx - r * 0.3} cy={nd.sy - r * 0.3} r={r * 0.25} fill="#fff" opacity={0.55} />
+        {showLabel && (
+          <text x={right ? nd.sx + r + 4 : nd.sx - r - 4} y={nd.sy + 4}
+            textAnchor={right ? 'start' : 'end'} style={orbitLabel}>{nd.label}</text>
+        )}
+      </g>
+    );
+  };
+
+  const back = nodes.filter((nd) => nd.z2 < 0);
+  const front = nodes.filter((nd) => nd.z2 >= 0);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle}
+      onMouseEnter={() => { paused.current = true; }}
+      onMouseLeave={() => { paused.current = false; }}>
+      <defs>
+        <radialGradient id="orb-hi" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#a5b4fc" /><stop offset="100%" stopColor={baseColor} />
+        </radialGradient>
+        <radialGradient id="orb-lo" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#ffffff" /><stop offset="100%" stopColor="#cfd2e8" />
+        </radialGradient>
+      </defs>
+      {/* faint orbital rings for the interconnected feel */}
+      {[0, 60, 120].map((rot, i) => (
+        <ellipse key={i} cx={cx} cy={cy} rx={R * 1.04} ry={R * 0.42}
+          transform={`rotate(${rot} ${cx} ${cy})`} fill="none" stroke="#e3e5f0" strokeWidth={1} />
+      ))}
+      {back.map(renderNode)}
+      {/* center node */}
+      <circle cx={cx} cy={cy} r={30} fill="#0a0a0a" />
+      <text x={cx} y={cy + 5} textAnchor="middle" style={orbitCenter}>{centerLabel}</text>
+      {front.map(renderNode)}
+    </svg>
+  );
+}
+
+const orbitLabel: React.CSSProperties = { fontSize: 11, fill: '#1f2937', fontWeight: 600, paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 } as React.CSSProperties;
+const orbitCenter: React.CSSProperties = { fontSize: 15, fill: '#fff', fontWeight: 700 };
+
 const svgStyle: React.CSSProperties = { width: '100%', height: 'auto', display: 'block' };
 const axis: React.CSSProperties = { fontSize: 12, fill: '#888' };
 const axisSm: React.CSSProperties = { fontSize: 10, fill: '#999' };
