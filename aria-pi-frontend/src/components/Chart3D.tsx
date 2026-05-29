@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { relaxLabels, truncate } from '@/lib/chart-labels';
 
 // Lighten (amt>0) or darken (amt<0) a hex color by mixing toward white/black.
 export function shade(hex: string, amt: number): string {
@@ -102,10 +103,26 @@ export function IsoScatter({ points, xLabel, yLabel, zLabel }: {
             <ellipse cx={fx} cy={fy} rx={6} ry={3} fill="#000" opacity={0.06} />
             <circle cx={sx} cy={sy} r={9} fill={p.highlight ? 'url(#iso-hi)' : 'url(#iso-lo)'} stroke={p.highlight ? '#4f46e5' : '#9aa0c8'} strokeWidth={1} />
             <circle cx={sx - 2.5} cy={sy - 2.5} r={2} fill="#fff" opacity={0.6} />
-            <text x={sx + 11} y={sy + 4} style={pointLabel}>{p.label}</text>
           </g>
         );
       })}
+      {/* de-collided labels with leader lines, drawn on top */}
+      {(() => {
+        const placed = relaxLabels(
+          pts.map((p) => { const [sx, sy] = proj(p.nx, p.ny, p.nz); return { x: sx, y: sy, text: truncate(p.label, 16) }; }),
+          { fontSize: 10.5, iterations: 130, bounds: { minX: 6, maxX: W - 6, minY: 6, maxY: H - 6 } },
+        );
+        return (
+          <g>
+            {placed.map((p, i) => p.moved && (
+              <line key={`l${i}`} x1={p.x} y1={p.y} x2={p.lx} y2={p.ly - 3.5} stroke="#c8cbe0" strokeWidth={0.8} />
+            ))}
+            {placed.map((p, i) => (
+              <text key={`t${i}`} x={p.lx} y={p.ly} textAnchor="middle" style={isoLabel}>{p.text}</text>
+            ))}
+          </g>
+        );
+      })()}
     </svg>
   );
 }
@@ -225,5 +242,5 @@ const svgStyle: React.CSSProperties = { width: '100%', height: 'auto', display: 
 const axis: React.CSSProperties = { fontSize: 12, fill: '#888' };
 const axisSm: React.CSSProperties = { fontSize: 10, fill: '#999' };
 const valLabel: React.CSSProperties = { fontSize: 10, fill: '#0a0a0a', fontWeight: 700 };
-const pointLabel: React.CSSProperties = { fontSize: 11, fill: '#374151', fontWeight: 600 };
+const isoLabel: React.CSSProperties = { fontSize: 10.5, fill: '#1f2937', fontWeight: 600, paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 } as React.CSSProperties;
 const empty: React.CSSProperties = { fontSize: 13, color: '#999', fontStyle: 'italic', padding: '20px 0' };

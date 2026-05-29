@@ -4,6 +4,7 @@ import React from 'react';
 import { fmtUsd } from '@/components/Report';
 import { computeAnalytics, type CompanyMetrics } from '@/lib/report-analytics';
 import { IsoScatter, OrbitNetwork } from '@/components/Chart3D';
+import { relaxLabels, truncate, type LabelInput } from '@/lib/chart-labels';
 
 const INDIGO = '#4f46e5';
 const INK = '#0a0a0a';
@@ -208,6 +209,21 @@ function ranks(vals: (number | null)[]): (number | null)[] {
   return out;
 }
 function Empty() { return <div style={st.empty}>Not enough reported data for this view.</div>; }
+// Renders de-collided point labels with thin leader lines back to their points.
+function LabelLayer({ items, fontSize = 11, bounds }: { items: LabelInput[]; fontSize?: number; bounds?: { minX: number; maxX: number; minY: number; maxY: number } }) {
+  if (!items.length) return null;
+  const placed = relaxLabels(items, { fontSize, bounds });
+  return (
+    <>
+      {placed.map((p, i) => p.moved && (
+        <line key={`ll${i}`} x1={p.x} y1={p.y} x2={p.lx} y2={p.ly - fontSize / 3} stroke="#c8cbe0" strokeWidth={0.8} />
+      ))}
+      {placed.map((p, i) => (
+        <text key={`lt${i}`} x={p.lx} y={p.ly} textAnchor="middle" style={{ ...st.haloLabel, fontSize }}>{p.text}</text>
+      ))}
+    </>
+  );
+}
 function Legend({ items }: { items: { label: string; color: string }[] }) {
   return <div style={st.legend}>{items.map((it, i) => <span key={i} style={st.legendItem}><span style={{ ...st.legendSwatch, background: it.color }} />{it.label}</span>)}</div>;
 }
@@ -237,7 +253,7 @@ function OpportunityMatrix({ cos }: { cos: CompanyMetrics[] }) {
       <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>Revenue (log) →</text>
       <text x={16} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 16 ${(pt + H - pb) / 2})`}>Priority →</text>
       {pts.map((c, i) => <circle key={i} cx={X(c)} cy={Y(c)} r={5 + Math.min(c.trials, 10) * 1.4} fill={c.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={c.uncTie ? 0.85 : 1} />)}
-      {labelled.map((c, i) => <text key={i} x={X(c) + 8} y={Y(c) - 8} style={st.pointLabel}>{c.name}</text>)}
+      <LabelLayer items={labelled.map((c) => ({ x: X(c), y: Y(c), text: truncate(c.name, 16) }))} bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
     </svg>
   );
 }
@@ -302,11 +318,9 @@ function Scatter({ cos }: { cos: CompanyMetrics[] }) {
       <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>R&D intensity % →</text>
       <text x={14} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 14 ${(pt + H - pb) / 2})`}>Net margin % →</text>
       {pts.map((c, i) => (
-        <g key={i}>
-          <circle cx={X(c.rdIntensity)} cy={Y(c.netMargin)} r={6} fill={c.netMargin >= 0 ? INK : RED} fillOpacity={0.8} />
-          <text x={X(c.rdIntensity) + 8} y={Y(c.netMargin) - 7} style={st.pointLabel}>{c.name}</text>
-        </g>
+        <circle key={i} cx={X(c.rdIntensity)} cy={Y(c.netMargin)} r={6} fill={c.netMargin >= 0 ? INK : RED} fillOpacity={0.8} />
       ))}
+      <LabelLayer items={pts.map((c) => ({ x: X(c.rdIntensity), y: Y(c.netMargin), text: truncate(c.name, 16) }))} bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
     </svg>
   );
 }
@@ -640,12 +654,13 @@ function TrialAlign({ cos }: { cos: CompanyMetrics[] }) {
       {pts.map((c, i) => {
         const jx = (i % 3 - 1) * 4, jy = (i % 2 - 0.5) * 6;
         return (
-          <g key={i}>
-            <circle cx={X(c.trials) + jx} cy={Y(c.alignment) + jy} r={5 + c.priority / 14} fill={c.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={c.uncTie ? 0.8 : 1} />
-            {(c.alignment >= 2 || c.trials >= 4) && <text x={X(c.trials) + jx + 8} y={Y(c.alignment) + jy - 7} style={st.pointLabel}>{c.name}</text>}
-          </g>
+          <circle key={i} cx={X(c.trials) + jx} cy={Y(c.alignment) + jy} r={5 + c.priority / 14} fill={c.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={c.uncTie ? 0.8 : 1} />
         );
       })}
+      <LabelLayer items={pts.map((c, i) => ({ c, jx: (i % 3 - 1) * 4, jy: (i % 2 - 0.5) * 6 }))
+        .filter((o) => o.c.alignment >= 2 || o.c.trials >= 4)
+        .map((o) => ({ x: X(o.c.trials) + o.jx, y: Y(o.c.alignment) + o.jy, text: truncate(o.c.name, 16) }))}
+        bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
     </svg>
   );
 }
@@ -690,16 +705,12 @@ function ConnectionNetwork({ cos }: { cos: CompanyMetrics[] }) {
           stroke={n.uncTie ? INDIGO : '#d4d4d4'} strokeWidth={1 + (n.alignment / maxAlign) * 6} strokeOpacity={0.55} />
       ))}
       {nodes.map((n, i) => {
-        const [x, y] = pos[i]; const r = 6 + n.priority / 8; const out = x >= cx;
-        return (
-          <g key={`n${i}`}>
-            <circle cx={x} cy={y} r={r} fill={n.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={n.uncTie ? 0.85 : 1} />
-            <text x={out ? x + r + 4 : x - r - 4} y={y + 4} textAnchor={out ? 'start' : 'end'} style={st.pointLabel}>{n.name}</text>
-          </g>
-        );
+        const [x, y] = pos[i]; const r = 6 + n.priority / 8;
+        return <circle key={`n${i}`} cx={x} cy={y} r={r} fill={n.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={n.uncTie ? 0.85 : 1} />;
       })}
       <circle cx={cx} cy={cy} r={42} fill={INK} />
       <text x={cx} y={cy + 5} textAnchor="middle" style={{ fontSize: 18, fill: '#fff', fontWeight: 700 }}>UNC</text>
+      <LabelLayer items={nodes.map((n, i) => ({ x: pos[i][0], y: pos[i][1], text: truncate(n.name, 16) }))} bounds={{ minX: 4, maxX: W - 4, minY: 14, maxY: H - 4 }} />
     </svg>
   );
 }
@@ -722,11 +733,9 @@ function FinancialBubble({ cos }: { cos: CompanyMetrics[] }) {
       <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>Revenue (log) →</text>
       <text x={14} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 14 ${(pt + H - pb) / 2})`}>Net margin % →</text>
       {pts.map((c, i) => (
-        <g key={i}>
-          <circle cx={X(c)} cy={Y(c.netMargin)} r={5 + Math.sqrt(c.rd / maxRd) * 22} fill={INDIGO} fillOpacity={0.28} stroke={INDIGO} />
-          <text x={X(c)} y={Y(c.netMargin) + 3} textAnchor="middle" style={{ fontSize: 9, fill: '#1f2937' }}>{c.name.split(' ')[0]}</text>
-        </g>
+        <circle key={i} cx={X(c)} cy={Y(c.netMargin)} r={5 + Math.sqrt(c.rd / maxRd) * 22} fill={INDIGO} fillOpacity={0.28} stroke={INDIGO} />
       ))}
+      <LabelLayer items={pts.map((c) => ({ x: X(c), y: Y(c.netMargin), text: truncate(c.name, 14) }))} fontSize={10} bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
     </svg>
   );
 }
@@ -944,6 +953,7 @@ const st: Record<string, React.CSSProperties> = {
   axisSm: { fontSize: 10, fill: '#999' },
   quad: { fontSize: 11, fill: '#b4b4b4', fontWeight: 600 },
   pointLabel: { fontSize: 11, fill: '#374151', fontWeight: 600 },
+  haloLabel: { fill: '#1f2937', fontWeight: 600, paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 } as React.CSSProperties,
   barLabel: { fontSize: 12, fill: '#374151' },
   barVal: { fontSize: 11, fill: '#0a0a0a', fontWeight: 700 },
   tmName: { fontSize: 13, fill: '#fff', fontWeight: 700 },
