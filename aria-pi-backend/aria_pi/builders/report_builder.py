@@ -18,7 +18,7 @@ import urllib.parse
 from datetime import datetime
 from typing import Dict, List, Any
 
-from aria_pi.sectors import canonical_sector
+from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
@@ -47,7 +47,9 @@ class ReportBuilder:
         s1 = self._section1(ctx, sector, companies)
         s2 = self._section2(sector, companies)
         s3 = self._section3(companies)
-        s4 = [self._profile(c, ctx) for c in companies[:10]]
+        nc_names = {n.lower() for n in SECTOR_NC_SEEDS.get(
+            canonical_sector(sector) or sector.lower(), [])}
+        s4 = [self._profile(c, ctx, nc_names) for c in companies[:22]]
         s5 = self._section5(sector, companies)
         s6 = self._section6(companies)
         report = {
@@ -332,7 +334,7 @@ class ReportBuilder:
 
     def _section3(self, companies: List[dict]) -> dict:
         selected = []
-        for c in companies[:10]:
+        for c in companies[:22]:
             facts = c.get("facts", {}) or {}
             tie = "Yes" if c.get("pubmed") else "Unknown"
             selected.append({
@@ -344,7 +346,7 @@ class ReportBuilder:
             })
         return {"selected": selected, "excluded": []}
 
-    def _profile(self, c: dict, ctx: dict) -> dict:
+    def _profile(self, c: dict, ctx: dict, nc_names: set = None) -> dict:
         facts = c.get("facts", {}) or {}
         edgar_url = facts.get("edgar_url", "https://www.sec.gov")
         trials = c.get("trials", []) or []
@@ -490,6 +492,7 @@ class ReportBuilder:
             })
 
         sector_tag = (facts.get("sic") or "").strip() or ctx.get("sector", "").title()
+        nc_based = bool(nc_names and c["name"].lower() in nc_names)
 
         # Enrich UNC alumni with LinkedIn search URLs and company profile links
         raw_alumni = c.get("unc_alumni") or []
@@ -507,6 +510,7 @@ class ReportBuilder:
         return {
             "company_name": c["name"],
             "sector_tag": sector_tag,
+            "nc_based": nc_based,
             "overview": {"text": overview_text,
                          "sources": [edgar_url, _first_trial_url(c)]},
             "partnership_type": "Strategic" if len(trials) > 5 else "Translational",

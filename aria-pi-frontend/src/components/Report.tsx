@@ -28,6 +28,7 @@ export type ReportData = {
   section4_profiles: {
     company_name: string;
     sector_tag?: string;
+    nc_based?: boolean;
     overview: Sourced;
     partnership_type: string;
     existing_unc_tie: boolean;
@@ -356,6 +357,7 @@ export function normalize(raw: any): ReportData {
     section4_profiles: Array.isArray(d.section4_profiles) ? d.section4_profiles.map((p: any) => ({
       company_name: p?.company_name || '—',
       sector_tag: p?.sector_tag || '',
+      nc_based: !!p?.nc_based,
       overview: sourced(p?.overview),
       partnership_type: p?.partnership_type || 'Unknown',
       existing_unc_tie: !!p?.existing_unc_tie,
@@ -601,6 +603,11 @@ export default function Report({ data: rawData }: { data: any }) {
                 }}>
                   {p.existing_unc_tie ? 'Existing UNC tie' : 'No UNC tie'}
                 </span>
+                {p.nc_based && (
+                  <span style={{ ...styles.flag, background: '#dcfce7', color: '#166534' }}>
+                    NC-Based
+                  </span>
+                )}
               </div>
             </div>
 

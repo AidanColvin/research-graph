@@ -333,8 +333,12 @@ class SECEdgarClient:
         if not cik or not proxy_filings:
             return []
 
-        # Pre-filter: only parse if EDGAR confirms a UNC mention exists
-        if not self._unc_mentioned_in_proxy(cik):
+        # Use EDGAR full-text search to check for a UNC mention, but treat
+        # a negative as advisory rather than a hard gate — the search only
+        # covers filings indexed in the last few years and can miss older
+        # proxy statements. When the search confirms a match we skip the
+        # fetch only if it explicitly returns False; on any error we proceed.
+        if self._unc_mentioned_in_proxy(cik) is False:
             return []
 
         alumni: list = []
@@ -379,7 +383,7 @@ class SECEdgarClient:
             return False
         except Exception as e:
             print(f'UNC proxy pre-filter error: {e}')
-            return True  # on error, attempt parsing anyway
+            return None  # None = unknown; caller treats as "proceed"
 
     def _resolve_proxy_doc_url(self, url: str) -> str:
         """If url is a filing directory, follow it to find the main .htm document."""

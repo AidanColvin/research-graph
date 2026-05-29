@@ -107,6 +107,43 @@ SECTOR_SEEDS = {
                    "Rockwell Automation", "Dover Corporation", "Xylem", "IDEX Corporation", "Watts Water Technologies"],
 }
 
+# NC-based companies added on top of the global seeds for each sector.
+# These are always fetched and profiled in addition to the top-15 global list
+# so a Technology search surfaces SAS Institute, Red Hat, Epic Games, etc.
+# alongside Apple and Microsoft.  Private companies (SAS, Red Hat, Epic) will
+# show partial profiles sourced from ClinicalTrials.gov / PubMed / NIH — they
+# won't have SEC facts but are still valuable for UNC partnership context.
+SECTOR_NC_SEEDS = {
+    # Research Triangle / Cary / Raleigh / Morrisville tech cluster
+    "technology": ["SAS Institute", "Red Hat", "Epic Games", "Lenovo",
+                   "Bandwidth", "Pendo", "Duck Creek Technologies"],
+    "software": ["SAS Institute", "Red Hat", "Bandwidth", "Pendo", "Duck Creek Technologies"],
+    "artificial intelligence": ["SAS Institute", "Red Hat", "Lenovo"],
+    "cloud computing": ["Red Hat", "SAS Institute", "Bandwidth"],
+    "cybersecurity": ["Bandwidth", "Red Hat", "Pendo"],
+    # RTP pharma / CRO corridor (Durham, Morrisville, RTP)
+    "pharmaceutical": ["IQVIA Holdings", "Syneos Health", "PPD"],
+    "biotech": ["IQVIA Holdings", "KBI Biopharma", "Avid Bioservices"],
+    "healthcare": ["Labcorp", "Amedisys", "Aveanna Healthcare", "Atrium Health"],
+    "medtech": ["Labcorp", "Nuo Therapeutics", "Haemonetics"],
+    "health it": ["Netsmart Technologies", "Inovalon Holdings", "Privia Health"],
+    "rural health": ["Labcorp", "Amedisys", "Atrium Health"],
+    # Charlotte financial hub
+    "finance": ["Truist Financial", "First Citizens BancShares", "Ally Financial",
+                "LPL Financial", "Synchrony Financial"],
+    "insurance": ["First American Financial", "Radian Group", "Employers Holdings"],
+    "fintech": ["Truist Financial", "First Citizens BancShares", "Ally Financial"],
+    # NC industrial / manufacturing
+    "industrial": ["Nucor Corporation", "Sealed Air Corporation", "Sonoco Products",
+                   "Enpro Industries", "SPX Technologies"],
+    "aerospace": ["Spirit AeroSystems", "Triumph Group"],
+    # NC energy / utilities
+    "energy": ["Duke Energy", "Dominion Energy North Carolina"],
+    "climate tech": ["Duke Energy", "Dominion Energy North Carolina"],
+    # Telecom
+    "telecom": ["Bandwidth", "Limelight Networks"],
+}
+
 # Broad domain per sector — used to pick which UNC datasets / talent programs
 # are relevant. "health" assets only surface for health sectors, etc.
 SECTOR_DOMAIN = {

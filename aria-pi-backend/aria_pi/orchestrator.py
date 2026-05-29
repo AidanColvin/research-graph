@@ -30,6 +30,7 @@ from aria_pi.sectors import (
     seeds_for as _seeds_for,
     canonical_sector,
     SECTOR_SEEDS,
+    SECTOR_NC_SEEDS,
     DEFAULT_SEEDS,
 )
 
@@ -84,7 +85,7 @@ async def run_pipeline(req: PipelineRequest):
         # 1. Real data collection per company — runs all sources in parallel
         # for up to 10 candidate companies within the Vercel 60s budget.
         company_data = _fetch_all_concurrent(
-            seeds[:15], sec=sec, trials=trials, pubmed=pubmed, nih=nih
+            seeds[:22], sec=sec, trials=trials, pubmed=pubmed, nih=nih
         )
 
         # 2. Deterministic synthesis
@@ -125,21 +126,24 @@ def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
 
       1. override    — caller passed explicit companies.
       2. curated      — the sector maps to one of our 24 canonical sectors,
-                        which have hand-picked top-10 lists (highest quality).
+                        which have hand-picked top-15 global lists plus
+                        NC-specific companies appended at the end.
       3. discovered   — ANY other free-text term ("pasta", "video games"):
                         pull real, currently-traded companies live from SEC
-                        EDGAR full-text search. This is what makes the tool
-                        work for arbitrary searches instead of defaulting.
-      4. default      — only if SEC discovery returns nothing (network/odd
-                        term): a small generic anchor list, clearly flagged.
+                        EDGAR full-text search.
+      4. default      — only if SEC discovery returns nothing.
     """
     if override:
         return list(override), "override"
     canon = canonical_sector(sector)
     if canon and canon in SECTOR_SEEDS:
-        return SECTOR_SEEDS[canon], "curated"
+        global_seeds = SECTOR_SEEDS[canon]
+        # Append NC-specific companies that aren't already in the global list.
+        nc_extras = [c for c in SECTOR_NC_SEEDS.get(canon, [])
+                     if c not in global_seeds]
+        return global_seeds + nc_extras, "curated"
     try:
-        discovered = sec.discover_companies(sector, limit=10)
+        discovered = sec.discover_companies(sector, limit=15)
     except Exception as e:
         print(f"discovery failed for '{sector}': {e}")
         discovered = []
