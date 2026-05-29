@@ -659,9 +659,9 @@ export default function Report({ data: rawInput }: { data: any }) {
   return (
     <CitationCtx.Provider value={citations}>
     <FloatingTOC />
-    <article style={styles.article}>
+    <article id="report-article" style={styles.article}>
       {/* DOWNLOAD TOOLBAR */}
-      <div style={styles.downloadBar}>
+      <div className="no-export" style={styles.downloadBar}>
         <span style={styles.downloadLabel}>Download report</span>
         <div style={styles.downloadBtns}>
           <button onClick={() => handleDownload('md')} disabled={!!busy} style={styles.dlBtn}>

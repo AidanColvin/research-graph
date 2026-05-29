@@ -326,6 +326,68 @@ function saveBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ── Capture the rendered report DOM into letter-page-sized PNG slices ────────
+// This is what makes the PDF / Word look exactly like the webpage: we snapshot
+// the live report element (real charts, tiles, tables, spacing) and slice it
+// into page-height pieces for pagination.
+async function captureReportSlices(): Promise<{ dataUrl: string; w: number; h: number }[]> {
+  const el = document.getElementById('report-article');
+  if (!el) throw new Error('Report element not found');
+
+  const { default: html2canvas } = await import('html2canvas');
+  const full = await html2canvas(el, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    logging: false,
+    windowWidth: el.scrollWidth,
+    // Skip the on-screen download toolbar so it never appears in the file.
+    ignoreElements: (node) => (node as HTMLElement).classList?.contains('no-export'),
+  });
+
+  // Slice into letter-aspect (8.5 x 11) page-height chunks, breaking on
+  // whitespace-ish rows where possible so we don't cut a line in half.
+  const pageH = Math.floor(full.width * (11 / 8.5));
+  const slices: { dataUrl: string; w: number; h: number }[] = [];
+  let y = 0;
+  while (y < full.height) {
+    let h = Math.min(pageH, full.height - y);
+    // If this isn't the last slice, nudge the cut up to a near-blank row to
+    // avoid slicing through text/charts.
+    if (y + h < full.height) {
+      const cut = findBlankRow(full, y + h, Math.floor(pageH * 0.14));
+      if (cut > y + pageH * 0.5) h = cut - y;
+    }
+    const c = document.createElement('canvas');
+    c.width = full.width;
+    c.height = h;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, h);
+    ctx.drawImage(full, 0, y, full.width, h, 0, 0, full.width, h);
+    slices.push({ dataUrl: c.toDataURL('image/png'), w: c.width, h });
+    y += h;
+  }
+  return slices;
+}
+
+// Scan upward from `from` for an all-white row within `maxUp` px (a clean place
+// to break a page). Returns the row y, or `from` if none found.
+function findBlankRow(canvas: HTMLCanvasElement, from: number, maxUp: number): number {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return from;
+  const w = canvas.width;
+  for (let y = from; y > from - maxUp && y > 0; y--) {
+    const row = ctx.getImageData(0, y, w, 1).data;
+    let blank = true;
+    for (let i = 0; i < row.length; i += 4 * 6) { // sample every 6th px
+      if (row[i] < 250 || row[i + 1] < 250 || row[i + 2] < 250) { blank = false; break; }
+    }
+    if (blank) return y;
+  }
+  return from;
+}
+
 // ── Chart -> PNG (for Word & PDF) ───────────────────────────────────────────
 // Draw a chart Block on an offscreen canvas and return a PNG data URL. Runs in
 // the browser only (download handlers are client-side).
@@ -457,125 +519,26 @@ export function downloadMarkdown(rawData: any) {
 
 // ── Renderer 2: Word (.docx) ────────────────────────────────────────────────
 export async function downloadDocx(rawData: any) {
-  const { blocks } = buildBlocks(rawData);
-  const {
-    Document, Packer, Paragraph, TextRun, HeadingLevel,
-    Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun, PageBreak,
-  } = await import('docx');
+  // Capture the rendered report so the .docx looks exactly like the webpage.
+  const slices = await captureReportSlices();
+  const { Document, Packer, Paragraph, ImageRun, PageBreak } = await import('docx');
 
-  // Pre-render every chart to a PNG up front (async), keyed by index, so the
-  // synchronous block loop below can drop the image in.
-  const chartImgs = new Map<number, { bytes: Uint8Array; w: number; h: number }>();
-  await Promise.all(blocks.map(async (blk, i) => {
-    if (blk.t === 'chart') {
-      try {
-        const { dataUrl, w, h } = await renderChartPng(blk);
-        chartImgs.set(i, { bytes: dataUrlToBytes(dataUrl), w, h });
-      } catch { /* fall back to table below */ }
-    }
-  }));
-
-  const thin = { style: BorderStyle.SINGLE, size: 1, color: 'DDDDDD' };
-  const cellBorders = { top: thin, bottom: thin, left: thin, right: thin };
-
+  // Letter content width at ~96dpi minus 0.5in margins each side (= 7.5in).
+  const targetW = 720;
   const children: any[] = [];
-  blocks.forEach((blk, blkIdx) => {
-    switch (blk.t) {
-      case 'h1':
-        children.push(new Paragraph({ text: blk.text, heading: HeadingLevel.TITLE }));
-        break;
-      case 'pagebreak':
-        children.push(new Paragraph({ children: [new PageBreak()] }));
-        break;
-      case 'h2':
-        children.push(new Paragraph({ text: blk.text, heading: HeadingLevel.HEADING_1, spacing: { before: 240, after: 120 } }));
-        break;
-      case 'h3':
-        children.push(new Paragraph({ text: blk.text, heading: HeadingLevel.HEADING_2, spacing: { before: 160, after: 80 } }));
-        break;
-      case 'p':
-        children.push(new Paragraph({ children: [new TextRun(blk.text)], spacing: { after: 120 } }));
-        break;
-      case 'meta':
-        blk.pairs.forEach(([k, val]) => children.push(new Paragraph({
-          children: [new TextRun({ text: `${k}: `, bold: true }), new TextRun(val)],
-          spacing: { after: 20 },
-        })));
-        break;
-      case 'list':
-        blk.items.forEach((i) => children.push(new Paragraph({ text: i, bullet: { level: 0 } })));
-        break;
-      case 'refs':
-        blk.items.forEach((r) => children.push(new Paragraph({
-          children: [new TextRun({ text: `${r.id}. ${r.text} ` }), new TextRun({ text: r.url, style: 'Hyperlink' })],
-          spacing: { after: 40 },
-        })));
-        break;
-      case 'table': {
-        const headerRow = new TableRow({
-          tableHeader: true,
-          children: blk.headers.map((h) => new TableCell({
-            borders: cellBorders,
-            shading: { fill: 'F4F4F4' },
-            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 18 })] })],
-          })),
-        });
-        const bodyRows = blk.rows.map((r) => new TableRow({
-          children: r.map((c) => new TableCell({
-            borders: cellBorders,
-            children: [new Paragraph({ children: [new TextRun({ text: c || '', size: 18 })] })],
-          })),
-        }));
-        children.push(new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [headerRow, ...bodyRows],
-        }));
-        children.push(new Paragraph({ text: '', spacing: { after: 120 } }));
-        break;
-      }
-      case 'chart': {
-        children.push(new Paragraph({
-          children: [new TextRun({ text: blk.title, bold: true, size: 20 })],
-          spacing: { before: 160, after: blk.subtitle ? 20 : 80 },
-        }));
-        if (blk.subtitle) {
-          children.push(new Paragraph({
-            children: [new TextRun({ text: blk.subtitle, italics: true, size: 16, color: '999999' })],
-            spacing: { after: 80 },
-          }));
-        }
-        const img = chartImgs.get(blkIdx);
-        if (img) {
-          children.push(new Paragraph({
-            children: [new ImageRun({ type: 'png', data: img.bytes, transformation: { width: img.w, height: img.h } })],
-            spacing: { after: 160 },
-          }));
-        } else {
-          // Fallback: render the series as a small table if the image failed.
-          const headerRow = new TableRow({
-            tableHeader: true,
-            children: [blk.chartKind === 'donut' ? 'Segment' : 'Company', 'Value'].map((h) => new TableCell({
-              borders: cellBorders, shading: { fill: 'F4F4F4' },
-              children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 18 })] })],
-            })),
-          });
-          const bodyRows = blk.series.map((s) => new TableRow({
-            children: [s.label, blk.money ? fmtUsd(s.value) : String(s.value)].map((c) => new TableCell({
-              borders: cellBorders,
-              children: [new Paragraph({ children: [new TextRun({ text: c, size: 18 })] })],
-            })),
-          }));
-          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...bodyRows] }));
-          children.push(new Paragraph({ text: '', spacing: { after: 120 } }));
-        }
-        break;
-      }
-    }
+  slices.forEach((s, i) => {
+    if (i > 0) children.push(new Paragraph({ children: [new PageBreak()] }));
+    const h = Math.round(targetW * (s.h / s.w));
+    children.push(new Paragraph({
+      children: [new ImageRun({ type: 'png', data: dataUrlToBytes(s.dataUrl), transformation: { width: targetW, height: h } })],
+    }));
   });
 
   const doc = new Document({
-    styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
-    sections: [{ properties: {}, children }],
+    sections: [{
+      properties: { page: { margin: { top: 360, bottom: 360, left: 360, right: 360 } } },
+      children,
+    }],
   });
   const blob = await Packer.toBlob(doc);
   saveBlob(blob, `${reportFilename(rawData)}.docx`);
@@ -583,113 +546,18 @@ export async function downloadDocx(rawData: any) {
 
 // ── Renderer 3: PDF ─────────────────────────────────────────────────────────
 export async function downloadPdf(rawData: any) {
-  const { blocks } = buildBlocks(rawData);
+  // Capture the rendered report so the PDF matches the webpage pixel-for-pixel.
+  const slices = await captureReportSlices();
   const { jsPDF } = await import('jspdf');
-  const { default: autoTable } = await import('jspdf-autotable');
-
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 54;
-  const contentW = pageW - margin * 2;
-  let y = margin;
-
-  const ensure = (need: number) => {
-    if (y + need > pageH - margin) { doc.addPage(); y = margin; }
-  };
-  const writeText = (text: string, size: number, opts: { bold?: boolean; color?: [number, number, number]; gapBefore?: number; gapAfter?: number } = {}) => {
-    const { bold = false, color = [31, 41, 55], gapBefore = 0, gapAfter = 6 } = opts;
-    y += gapBefore;
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(size);
-    doc.setTextColor(color[0], color[1], color[2]);
-    const lines = doc.splitTextToSize(text, contentW) as string[];
-    for (const line of lines) {
-      ensure(size + 4);
-      doc.text(line, margin, y);
-      y += size + 4;
-    }
-    y += gapAfter;
-  };
-
-  // Pre-render charts to PNGs (async), keyed by block index.
-  const chartImgs = new Map<number, { dataUrl: string; w: number; h: number }>();
-  await Promise.all(blocks.map(async (blk, i) => {
-    if (blk.t === 'chart') {
-      try { chartImgs.set(i, await renderChartPng(blk)); } catch { /* skip */ }
-    }
-  }));
-
-  blocks.forEach((blk, blkIdx) => {
-    switch (blk.t) {
-      case 'h1': writeText(blk.text, 24, { bold: true, color: [10, 10, 10], gapAfter: 10 }); break;
-      case 'pagebreak': doc.addPage(); y = margin; break;
-      case 'h2': writeText(blk.text, 16, { bold: true, color: [10, 10, 10], gapBefore: 14, gapAfter: 8 }); break;
-      case 'h3': writeText(blk.text, 12, { bold: true, color: [10, 10, 10], gapBefore: 8, gapAfter: 4 }); break;
-      case 'p': writeText(blk.text, 10.5); break;
-      case 'meta':
-        blk.pairs.forEach(([k, val]) => writeText(`${k}: ${val}`, 9.5, { color: [102, 102, 102], gapAfter: 2 }));
-        y += 4;
-        break;
-      case 'list':
-        blk.items.forEach((i) => writeText(`•  ${i}`, 10.5, { gapAfter: 3 }));
-        break;
-      case 'refs':
-        blk.items.forEach((r) => writeText(`${r.id}. ${r.text} ${r.url}`, 8.5, { color: [55, 65, 81], gapAfter: 2 }));
-        break;
-      case 'table':
-        autoTable(doc, {
-          head: [blk.headers],
-          body: blk.rows.map((r) => r.map((c) => c || '')),
-          startY: y + 2,
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 8.5, cellPadding: 4, overflow: 'linebreak', textColor: [31, 41, 55] },
-          headStyles: { fillColor: [244, 244, 244], textColor: [80, 80, 80], fontStyle: 'bold' },
-          theme: 'grid',
-          tableLineColor: [225, 225, 225],
-          tableLineWidth: 0.5,
-        });
-        // @ts-ignore – autotable stashes the final Y on the doc
-        y = (doc as any).lastAutoTable.finalY + 12;
-        break;
-      case 'chart': {
-        writeText(blk.title, 12, { bold: true, color: [10, 10, 10], gapBefore: 8, gapAfter: blk.subtitle ? 2 : 4 });
-        if (blk.subtitle) writeText(blk.subtitle, 9, { color: [153, 153, 153], gapAfter: 4 });
-        const img = chartImgs.get(blkIdx);
-        if (img) {
-          let dw = img.w, dh = img.h;
-          if (dw > contentW) { const r = contentW / dw; dw = contentW; dh = img.h * r; }
-          ensure(dh + 8);
-          doc.addImage(img.dataUrl, 'PNG', margin, y, dw, dh);
-          y += dh + 14;
-        } else {
-          autoTable(doc, {
-            head: [[blk.chartKind === 'donut' ? 'Segment' : 'Company', 'Value']],
-            body: blk.series.map((s) => [s.label, blk.money ? fmtUsd(s.value) : String(s.value)]),
-            startY: y + 2,
-            margin: { left: margin, right: margin },
-            styles: { fontSize: 8.5, cellPadding: 4, overflow: 'linebreak', textColor: [31, 41, 55] },
-            headStyles: { fillColor: [244, 244, 244], textColor: [80, 80, 80], fontStyle: 'bold' },
-            theme: 'grid', tableLineColor: [225, 225, 225], tableLineWidth: 0.5,
-          });
-          // @ts-ignore
-          y = (doc as any).lastAutoTable.finalY + 12;
-        }
-        break;
-      }
-    }
+  const margin = 24;
+  const w = pageW - margin * 2;
+  slices.forEach((s, i) => {
+    if (i > 0) doc.addPage();
+    const h = w * (s.h / s.w);
+    doc.addImage(s.dataUrl, 'PNG', margin, margin, w, Math.min(h, pageH - margin * 2));
   });
-
-  // Footer: page numbers
-  const pages = doc.getNumberOfPages();
-  for (let i = 1; i <= pages; i++) {
-    doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(160, 160, 160);
-    doc.text(`map · partnership intelligence`, margin, pageH - 24);
-    doc.text(`${i} / ${pages}`, pageW - margin, pageH - 24, { align: 'right' });
-  }
-
   doc.save(`${reportFilename(rawData)}.pdf`);
 }
