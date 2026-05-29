@@ -59,7 +59,12 @@ like `Energy Minerals`), **map** assembles a partnership intelligence report:
    with every claim backed by at least two citable URLs.
 4. Streams real progress to the browser as each company resolves, then renders
    an interactive report with charts and a live table of contents.
-5. Exports the report to Markdown, PDF, and Word, with the visuals preserved.
+5. Opens the same data in a multi-view workspace: **Report**, **Visualize**
+   (23 charts incl. 3D and network/Sankey diagrams), **Trends** (10-year SEC
+   financial trajectories), **Excel** (18-sheet analytics workbook), and
+   **Slide Deck** (speaker-noted, per-sector deck).
+6. Exports to Markdown, PDF, Word, Excel (`.xlsx`), and PowerPoint (`.pptx`),
+   with the on-screen visuals preserved.
 
 Every factual claim carries its source URLs. Anything that cannot be
 double-sourced is flagged for analyst review rather than guessed.
@@ -79,8 +84,24 @@ double-sourced is flagged for analyst review rather than guessed.
   snapshot, NC context, and active UNC units, first in the report.
 - **Interactive report.** Inline AMA citations, data visualizations distributed
   through the sections, and a floating scroll-spy table of contents.
-- **High-fidelity exports.** Markdown (editable, linked), plus PDF and Word that
-  capture the rendered report so they look like the web page.
+- **Multi-view workspace.** A top nav (Home / Report / Visualize / Trends /
+  Excel / Slide Deck) turns one report's data into five sector-customized views
+  that work like a normal website.
+- **Visualize.** 23 unique, per-sector charts including 3D isometric bars and
+  scatter, a connection network, a Sankey flow, correlation matrix, Lorenz
+  curve, Pareto, box plots, and a radar.
+- **Trends.** Stock-style 10-year SEC financial trajectories (revenue, R&D,
+  net income) showing what grew and what shrank, with CAGR and momentum, and
+  thin-coverage years dropped so the latest partial fiscal year never distorts.
+- **Excel workspace.** An 18-sheet analytics workbook (HHI concentration,
+  correlation matrix, quartiles, CAGR, partnership-priority scores, segments)
+  with on-screen analytics and live clickable worksheet previews.
+- **Slide deck.** A bullet-driven, graduate-level, per-sector deck with speaker
+  notes, exportable to PowerPoint.
+- **High-fidelity exports.** Markdown (editable, linked), plus PDF, Word, Excel,
+  and PowerPoint that capture the rendered report so they look like the web page.
+- **Responsive.** Lays out cleanly on phones and tablets (iPhone / iPad): the
+  nav wraps, tables scroll horizontally, and SVG charts scale to width.
 - **Animated intro.** A network-graph splash that builds out from a central
   node before handing off to the app.
 
@@ -99,7 +120,8 @@ flowchart LR
     API -->|deterministic build| RB[ReportBuilder]
     RB -->|JSON report| NX
     NX -->|render| RPT[Report component]
-    RPT -->|html2canvas| EX[PDF / Word / Markdown]
+    RPT -->|views| VW[Report / Visualize / Trends / Excel / Slides]
+    VW -->|html2canvas + xlsx + pptxgenjs| EX[PDF / Word / Markdown / Excel / PowerPoint]
 ```
 
 **Two independently deployed Vercel projects:**
@@ -132,7 +154,8 @@ loads.
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js 14 (App Router), React 18, TypeScript 5 |
-| Exports | `docx`, `jspdf`, `html2canvas` |
+| Charts | Hand-rolled inline SVG (no chart library), incl. isometric 3D |
+| Exports | `docx`, `jspdf`, `html2canvas`, `xlsx` (SheetJS), `pptxgenjs` |
 | Backend | FastAPI, Pydantic, `requests` (Python 3.12) |
 | Runtime | Vercel (Next.js + `@vercel/python` serverless) |
 | Data | SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER |
@@ -157,8 +180,14 @@ research-graph/
 │       │       └── run-pipeline-stream/route.ts  # SSE proxy to backend
 │       ├── components/
 │       │   ├── Report.tsx             # report renderer, charts, TOC, summary
+│       │   ├── VisualsView.tsx        # Visualize page: 23 charts + diagrams
+│       │   ├── TrendsView.tsx         # Trends page: 10-year SEC trajectories
+│       │   ├── Chart3D.tsx            # isometric 3D bars + scatter (SVG)
 │       │   └── Intro.tsx              # animated network-graph splash
 │       └── lib/
+│           ├── report-analytics.ts    # HHI, correlation, quartiles, scores
+│           ├── report-excel.ts        # 18-sheet .xlsx workbook builder
+│           ├── report-slides.ts       # per-sector .pptx deck + speaker notes
 │           └── report-export.ts       # Markdown / PDF / Word exporters
 │
 ├── aria-pi-backend/                   # FastAPI service  (Vercel: aria-pi-api)
@@ -252,6 +281,26 @@ Each report contains a one-page **Summary** followed by seven sections:
 
 ---
 
+## Workspace views
+
+The top nav exposes five views over the same generated report. Each is
+customized to the resolved sector and downloadable.
+
+| View | What it shows | Export |
+|---|---|---|
+| **Report** | The sourced 7-section report + one-page summary | Markdown, PDF, Word |
+| **Visualize** | 23 sector-specific charts: 3D isometric bars/scatter, connection network, Sankey, correlation matrix, Lorenz curve, Pareto, box plots, radar, heatmap | (image capture via PDF/Word) |
+| **Trends** | 10-year SEC financial trajectories (revenue, R&D, net income), CAGR, growth momentum; thin-coverage years dropped | - |
+| **Excel** | 18-sheet analytics workbook with live, clickable worksheet previews and on-screen analytics | `.xlsx` |
+| **Slide Deck** | Bullet-driven, graduate-level, per-sector deck with speaker notes | `.pptx` |
+
+Analytics behind Visualize/Trends/Excel (`report-analytics.ts`): HHI
+concentration, Pearson correlation matrix, quartile and five-number summaries,
+CAGR, a 0-100 partnership-priority score, percentile ranks, Lorenz curve, and
+segment analysis.
+
+---
+
 ## Local development
 
 Two services run side by side. Use two terminals.
@@ -332,7 +381,12 @@ cd aria-pi-backend && npx vercel --prod
   granular "N of M analyzed" feedback.
 - **Export size.** PDF/Word capture the rendered DOM as paginated page images,
   so large reports (20+ companies) can run ~70-95 pages and take ~20s to build.
-  Markdown stays lightweight, fully text, and linked.
+  Markdown stays lightweight, fully text, and linked; Excel and PowerPoint are
+  generated from data and stay small.
+- **Mobile.** The UI is responsive on iPhone and iPad. The image-based PDF/Word
+  capture is memory-heavy, so on a phone, large (90+ page) captures are slow and
+  best done on a laptop; Markdown, Excel, and PowerPoint exports are light and
+  fine on mobile. The floating table of contents is hidden below 1380px.
 
 ---
 
