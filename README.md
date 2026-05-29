@@ -60,7 +60,8 @@ like `Energy Minerals`), **map** assembles a partnership intelligence report:
 4. Streams real progress to the browser as each company resolves, then renders
    an interactive report with charts and a live table of contents.
 5. Opens the same data in a multi-view workspace: **Report**, **Visualize**
-   (23 charts incl. 3D and network/Sankey diagrams), **Trends** (10-year SEC
+   (23 charts led by a rotating 3D connection orbit, plus network/Sankey
+   diagrams), **Trends** (10-year SEC
    financial trajectories), **Excel** (18-sheet analytics workbook), and
    **Slide Deck** (speaker-noted, per-sector deck).
 6. Exports to Markdown, PDF, Word, Excel (`.xlsx`), and PowerPoint (`.pptx`),
@@ -87,9 +88,11 @@ double-sourced is flagged for analyst review rather than guessed.
 - **Multi-view workspace.** A top nav (Home / Report / Visualize / Trends /
   Excel / Slide Deck) turns one report's data into five sector-customized views
   that work like a normal website.
-- **Visualize.** 23 unique, per-sector charts including 3D isometric bars and
-  scatter, a connection network, a Sankey flow, correlation matrix, Lorenz
-  curve, Pareto, box plots, and a radar.
+- **Visualize.** 23 unique, per-sector charts led by a rotating 3D connection
+  orbit (companies circling a central UNC node, logo-style, hover to pause),
+  plus a 3D isometric scatter, a connection network, a Sankey flow, correlation
+  matrix, Lorenz curve, Pareto, box plots, and a radar. Soft gradient fills,
+  rounded bars, and gentle card shadows give the page a welcoming feel.
 - **Trends.** Stock-style 10-year SEC financial trajectories (revenue, R&D,
   net income) showing what grew and what shrank, with CAGR and momentum, and
   thin-coverage years dropped so the latest partial fiscal year never distorts.
@@ -154,7 +157,7 @@ loads.
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js 14 (App Router), React 18, TypeScript 5 |
-| Charts | Hand-rolled inline SVG (no chart library), incl. isometric 3D |
+| Charts | Hand-rolled inline SVG (no chart library), incl. animated 3D |
 | Exports | `docx`, `jspdf`, `html2canvas`, `xlsx` (SheetJS), `pptxgenjs` |
 | Backend | FastAPI, Pydantic, `requests` (Python 3.12) |
 | Runtime | Vercel (Next.js + `@vercel/python` serverless) |
@@ -182,7 +185,7 @@ research-graph/
 │       │   ├── Report.tsx             # report renderer, charts, TOC, summary
 │       │   ├── VisualsView.tsx        # Visualize page: 23 charts + diagrams
 │       │   ├── TrendsView.tsx         # Trends page: 10-year SEC trajectories
-│       │   ├── Chart3D.tsx            # isometric 3D bars + scatter (SVG)
+│       │   ├── Chart3D.tsx            # rotating orbit + isometric 3D scatter (SVG)
 │       │   └── Intro.tsx              # animated network-graph splash
 │       └── lib/
 │           ├── report-analytics.ts    # HHI, correlation, quartiles, scores
@@ -289,7 +292,7 @@ customized to the resolved sector and downloadable.
 | View | What it shows | Export |
 |---|---|---|
 | **Report** | The sourced 7-section report + one-page summary | Markdown, PDF, Word |
-| **Visualize** | 23 sector-specific charts: 3D isometric bars/scatter, connection network, Sankey, correlation matrix, Lorenz curve, Pareto, box plots, radar, heatmap | (image capture via PDF/Word) |
+| **Visualize** | 23 sector-specific charts: rotating 3D connection orbit, 3D isometric scatter, connection network, Sankey, correlation matrix, Lorenz curve, Pareto, box plots, radar, heatmap | (image capture via PDF/Word) |
 | **Trends** | 10-year SEC financial trajectories (revenue, R&D, net income), CAGR, growth momentum; thin-coverage years dropped | - |
 | **Excel** | 18-sheet analytics workbook with live, clickable worksheet previews and on-screen analytics | `.xlsx` |
 | **Slide Deck** | Bullet-driven, graduate-level, per-sector deck with speaker notes | `.pptx` |
