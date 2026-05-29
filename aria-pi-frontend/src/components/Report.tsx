@@ -398,8 +398,8 @@ export function normalize(raw: any): ReportData {
 
 // ── Charts & thesis helpers ─────────────────────────────────────────────────
 
-// Parse a formatted money string like "$416.16B (FY2025)" → 416160000000.
-function parseMoney(s?: string): number {
+// Parse a formatted money string like "$416.16B (FY2025)" -> 416160000000.
+export function parseMoney(s?: string): number {
   if (!s) return 0;
   const m = s.replace(/[, ]/g, '').match(/\$?(-?\d+(?:\.\d+)?)\s*([BMTK])?/i);
   if (!m) return 0;
@@ -413,7 +413,7 @@ function parseMoney(s?: string): number {
   return v;
 }
 
-function fmtUsd(n: number): string {
+export function fmtUsd(n: number): string {
   if (!n) return 'n/a';
   if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
@@ -522,6 +522,75 @@ function Donut({ title, segments }: {
   );
 }
 
+// One big-number tile for the executive overview.
+function Tile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={styles.tile}>
+      <div style={styles.tileValue}>{value}</div>
+      <div style={styles.tileLabel}>{label}</div>
+    </div>
+  );
+}
+
+// Floating, scroll-spy table of contents shown only on wide screens.
+const TOC_ITEMS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'sec-1', label: '1 · Sector Overview' },
+  { id: 'sec-2', label: '2 · Internal Mapping' },
+  { id: 'sec-3', label: '3 · Company Selection' },
+  { id: 'sec-4', label: '4 · Company Profiles' },
+  { id: 'sec-5', label: '5 · Value Proposition' },
+  { id: 'sec-6', label: '6 · Talking Points' },
+  { id: 'sec-7', label: '7 · References' },
+];
+
+function FloatingTOC() {
+  const [active, setActive] = React.useState('overview');
+  const [wide, setWide] = React.useState(false);
+
+  React.useEffect(() => {
+    const onResize = () => setWide(window.innerWidth >= 1380);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  React.useEffect(() => {
+    if (!wide) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => { if (e.isIntersecting) setActive(e.target.id); });
+      },
+      { rootMargin: '-15% 0px -75% 0px' },
+    );
+    TOC_ITEMS.forEach((it) => {
+      const el = document.getElementById(it.id);
+      if (el) obs.observe(el);
+    });
+    return () => obs.disconnect();
+  }, [wide]);
+
+  if (!wide) return null;
+  return (
+    <nav style={styles.toc} aria-label="Report contents">
+      <div style={styles.tocHead}>Contents</div>
+      {TOC_ITEMS.map((it) => (
+        <a
+          key={it.id}
+          href={`#${it.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById(it.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+          style={{ ...styles.tocItem, ...(active === it.id ? styles.tocItemActive : {}) }}
+        >
+          {it.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 // ── Main Report ───────────────────────────────────────────────────────────────
 export default function Report({ data: rawInput }: { data: any }) {
   // Scrub em/en dashes from the entire payload once, so both the on-screen
@@ -540,6 +609,7 @@ export default function Report({ data: rawInput }: { data: any }) {
   const strategic = profiles.filter((p) => p.partnership_type === 'Strategic').length;
   const translational = nCos - strategic;
   const ncBased = profiles.filter((p) => p.nc_based).length;
+  const totalTrials = profiles.reduce((s, p) => s + (p.pipeline?.length || 0), 0);
   const topTied = tied.slice(0, 3).map((p) => p.company_name);
 
   const revenueData = profiles
@@ -570,7 +640,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       else await downloadDocx(rawData);
     } catch (e) {
       console.error('Download failed:', e);
-      alert('Sorry — that download failed. Please try again.');
+      alert('Sorry, that download failed. Please try again.');
     } finally {
       setBusy(null);
     }
@@ -578,6 +648,7 @@ export default function Report({ data: rawInput }: { data: any }) {
 
   return (
     <CitationCtx.Provider value={citations}>
+    <FloatingTOC />
     <article style={styles.article}>
       {/* DOWNLOAD TOOLBAR */}
       <div style={styles.downloadBar}>
@@ -631,10 +702,21 @@ export default function Report({ data: rawInput }: { data: any }) {
         )}
       </header>
 
-      {/* THESIS */}
+      {/* EXECUTIVE OVERVIEW — 10-second scan */}
       {nCos > 0 && (
-        <section style={styles.section}>
-          <H3>Thesis</H3>
+        <section id="overview" style={styles.section}>
+          <H2 n={0} title="Overview" />
+          <p style={styles.overviewHint}>A ten-second scan. The full sourced report follows below.</p>
+
+          <div style={styles.tileGrid}>
+            <Tile label="Companies reviewed" value={nCos} />
+            <Tile label="Documented UNC tie" value={tied.length} />
+            <Tile label="Strategic scale" value={strategic} />
+            <Tile label="NC-based" value={ncBased} />
+            <Tile label="Trial programs" value={totalTrials} />
+            {v && <Tile label="Claims sourced" value={`${v.verified}/${v.total_claims}`} />}
+          </div>
+
           <p style={styles.claim}>
             We reviewed <strong>{nCos}</strong> {m.sector} {nCos === 1 ? 'company' : 'companies'} as
             research partners for UNC Chapel Hill.{' '}
@@ -653,11 +735,28 @@ export default function Report({ data: rawInput }: { data: any }) {
               <Cite urls={data.section6_talking_points.sector_opening.sources} />
             </p>
           )}
+
+          <div style={styles.chartGrid}>
+            <Donut
+              title="Existing UNC connection"
+              segments={[
+                { label: 'Existing tie', value: tied.length, color: '#0a0a0a' },
+                { label: 'No documented tie', value: nCos - tied.length, color: '#d4d4d4' },
+              ]}
+            />
+            <Donut
+              title="Partnership scale"
+              segments={[
+                { label: 'Strategic', value: strategic, color: '#0a0a0a' },
+                { label: 'Translational', value: translational, color: '#9a988f' },
+              ]}
+            />
+          </div>
         </section>
       )}
 
       {/* SECTION 1 */}
-      <section style={styles.section}>
+      <section id="sec-1" style={styles.section}>
         <H2 n={1} title="Sector Overview" />
 
         <H3>1.1 Sector Definition and Scale</H3>
@@ -699,7 +798,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 2 */}
-      <section style={styles.section}>
+      <section id="sec-2" style={styles.section}>
         <H2 n={2} title="Internal Mapping" />
 
         <H3>2.1 Known UNC Partnerships in This Sector</H3>
@@ -753,27 +852,8 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 3 */}
-      <section style={styles.section}>
+      <section id="sec-3" style={styles.section}>
         <H2 n={3} title="Company Selection" />
-
-        {nCos > 0 && (
-          <div style={styles.chartGrid}>
-            <Donut
-              title="Existing UNC connection"
-              segments={[
-                { label: 'Existing tie', value: tied.length, color: '#0a0a0a' },
-                { label: 'No documented tie', value: nCos - tied.length, color: '#d4d4d4' },
-              ]}
-            />
-            <Donut
-              title="Partnership scale"
-              segments={[
-                { label: 'Strategic', value: strategic, color: '#0a0a0a' },
-                { label: 'Translational', value: translational, color: '#9a988f' },
-              ]}
-            />
-          </div>
-        )}
 
         <H3>3.2 Companies Selected</H3>
         {data.section3_selection.selected?.length ? (
@@ -798,7 +878,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 4 - Company Profiles */}
-      <section style={styles.section}>
+      <section id="sec-4" style={styles.section}>
         <H2 n={4} title="Company Profiles" />
         {trialsData.length > 0 && (
           <div style={styles.chartGridSingle}>
@@ -980,7 +1060,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 5 */}
-      <section style={styles.section}>
+      <section id="sec-5" style={styles.section}>
         <H2 n={5} title="Value Proposition" />
 
         <H3>5.1 UNC Data Assets</H3>
@@ -1037,7 +1117,7 @@ export default function Report({ data: rawInput }: { data: any }) {
       </section>
 
       {/* SECTION 6 */}
-      <section style={styles.section}>
+      <section id="sec-6" style={styles.section}>
         <H2 n={6} title="Talking Points" />
 
         <H3>Sector Opening</H3>
@@ -1069,9 +1149,9 @@ export default function Report({ data: rawInput }: { data: any }) {
       {/* Section 7 (verification checklist) is computed by the backend for
           every report but intentionally not rendered to the public page. */}
 
-      {/* REFERENCES — AMA */}
+      {/* REFERENCES - AMA */}
       {citations.list.length > 0 && (
-        <section style={styles.section}>
+        <section id="sec-7" style={styles.section}>
           <H2 n={7} title="References" />
           <p style={styles.refNote}>Citations follow AMA Manual of Style (11th ed.).</p>
           <ol style={styles.refList}>
@@ -1574,4 +1654,62 @@ const styles: Record<string, CSSProperties> = {
   legendRow: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' },
   legendSwatch: { width: 12, height: 12, borderRadius: 3, flexShrink: 0, display: 'inline-block' },
   chartNote: { fontSize: 12, color: '#999', marginTop: 16, lineHeight: 1.6, fontStyle: 'italic' },
+
+  // Executive overview
+  overviewHint: { fontSize: 13, color: '#999', marginTop: -8, marginBottom: 18 },
+  tileGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+    gap: 12,
+    marginBottom: 20,
+  },
+  tile: {
+    border: '1px solid #eee',
+    borderRadius: 12,
+    padding: '16px 18px',
+    background: '#fafafa',
+  },
+  tileValue: { fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em', color: '#0a0a0a', lineHeight: 1 },
+  tileLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: '#777',
+    marginTop: 8,
+  },
+
+  // Floating table of contents
+  toc: {
+    position: 'fixed',
+    top: 140,
+    left: 28,
+    width: 180,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    zIndex: 20,
+  },
+  tocHead: {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: '#bbb',
+    marginBottom: 8,
+  },
+  tocItem: {
+    fontSize: 12.5,
+    color: '#9a9a9a',
+    textDecoration: 'none',
+    padding: '4px 0 4px 12px',
+    borderLeft: '2px solid #eee',
+    lineHeight: 1.3,
+    transition: 'color 0.15s, border-color 0.15s',
+  },
+  tocItemActive: {
+    color: '#0a0a0a',
+    fontWeight: 600,
+    borderLeft: '2px solid #0a0a0a',
+  },
 };
