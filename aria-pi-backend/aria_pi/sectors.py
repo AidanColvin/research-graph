@@ -236,7 +236,111 @@ _EXACT_ALIASES = {
     "financial service": "finance",
     "financial": "finance",
     "banking": "finance",
+    # Short, unambiguous shorthands.
+    "fin": "finance",
+    "med": "medtech",
+    "ev": "automotive",
+    "evs": "automotive",
+    "iot": "technology",
+    "vr": "technology",
+    "ar": "technology",
+    "chips": "semiconductors",
+    "semis": "semiconductors",
 }
+
+
+# ── Edit-distance fuzzy matching (robust misspelling tolerance) ───────────────
+# Extra single-word synonyms that map cleanly to one canonical sector. These,
+# plus the canonical keys themselves, form the candidate vocabulary the fuzzy
+# matcher compares a typed term against.
+_FUZZY_SYNONYMS = {
+    "pharma": "pharmaceutical", "pharmaceuticals": "pharmaceutical",
+    "semiconductor": "semiconductors",
+    "automobile": "automotive", "automotives": "automotive",
+    "insurer": "insurance", "insurances": "insurance",
+    "retailer": "retail", "aerospace": "aerospace", "robotics": "robotics",
+    "oncology": "oncology", "cybersecurity": "cybersecurity",
+    "telecommunications": "telecom", "telecommunication": "telecom",
+    "healthcare": "healthcare", "industrials": "industrial",
+}
+
+# Build candidate vocabulary: canonical keys + synonyms. Each entry maps a
+# text token/phrase to its canonical sector key.
+_FUZZY_VOCAB: dict = {}
+for _k in SECTOR_SEEDS:
+    _FUZZY_VOCAB[_k] = _k
+_FUZZY_VOCAB.update(_FUZZY_SYNONYMS)
+
+
+def _lev(a: str, b: str) -> int:
+    """Damerau (optimal string alignment) edit distance.
+
+    Counts an adjacent-character transposition (a common typo, e.g. "retial"
+    for "retail") as a single edit, which lets us use a strict threshold while
+    still catching real misspellings.
+    """
+    if a == b:
+        return 0
+    m, n = len(a), len(b)
+    if not m:
+        return n
+    if not n:
+        return m
+    d = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        d[i][0] = i
+    for j in range(n + 1):
+        d[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[m][n]
+
+
+def _close(inp: str, cand: str) -> bool:
+    """True if `inp` is a near-miss spelling of `cand` (strict)."""
+    if abs(len(inp) - len(cand)) > 2:
+        return False
+    thr = 1 if len(cand) <= 6 else 2 if len(cand) <= 9 else 3
+    d = _lev(inp, cand)
+    return d <= thr and d / max(1, len(cand)) <= 0.34
+
+
+def _fuzzy_sector(key: str) -> Optional[str]:
+    """Tolerant misspelling match against the candidate vocabulary.
+
+    Tries the whole input against multi/single-word candidates, then each token
+    against single-word candidates, picking the closest within a strict edit
+    threshold. Returns None for genuinely unknown terms (so niche searches like
+    'pasta' still fall through to live SEC discovery).
+    """
+    best: Optional[str] = None
+    best_d = 99
+    multi = " " in key
+    consider = []
+    if len(key) >= 4:
+        consider.append(key)
+    # Only fuzzy-match longer tokens; short words ("real", "data") are too
+    # close to sector names and cause false positives.
+    consider.extend(t for t in key.split() if len(t) >= 5 and t != key)
+    for term in consider:
+        for cand, target in _FUZZY_VOCAB.items():
+            # Multi-word candidate only compared to the whole input.
+            if " " in cand and term != key:
+                continue
+            # A qualified multi-word term must not fuzzy-match into a broad
+            # bucket (e.g. "consumer electronics" must stay discovery, not
+            # become "consumer"). Mirrors the keyword-route broad guard.
+            if multi and target in _BROAD_TARGETS:
+                continue
+            if _close(term, cand):
+                d = _lev(term, cand)
+                if d < best_d:
+                    best_d, best = d, target
+    return best
 
 
 # Generic catch-all sectors. A bare single word ("food", "tech", "energy")
@@ -293,13 +397,9 @@ def canonical_sector(sector: str) -> Optional[str]:
             if known in key or key in known:
                 return known
 
-    # Fuzzy: tolerate misspellings by comparing consonant skeletons.
-    skel = _collapse(key)
-    if len(skel) >= 3 and single_token:
-        for token, target in _FUZZY_ROUTES:
-            if _collapse(token) in skel:
-                return target
-    return None
+    # Fuzzy: tolerate misspellings via edit distance against the sector
+    # vocabulary (handles "tecnology", "oncolgy", "artifical intelligence", …).
+    return _fuzzy_sector(key)
 
 
 def seeds_for(sector: str, override: Optional[List[str]] = None) -> List[str]:
