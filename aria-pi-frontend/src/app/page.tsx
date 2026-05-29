@@ -3,6 +3,30 @@
 import { useState } from 'react';
 import Report, { ReportData } from '@/components/Report';
 import Intro from '@/components/Intro';
+import ExcelView from '@/components/ExcelView';
+import SlidesView from '@/components/SlidesView';
+
+type View = 'report' | 'excel' | 'slides';
+
+// Small brand mark shown next to the wordmark (a node-graph glyph echoing the
+// intro). Swap for an <img src="/logo.svg"> if you add a logo file.
+function LogoMark() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="3.2" fill="#0a0a0a" />
+      {[0, 60, 120, 180, 240, 300].map((deg) => {
+        const r = deg * Math.PI / 180;
+        const x = 12 + 8 * Math.cos(r), y = 12 + 8 * Math.sin(r);
+        return (
+          <g key={deg}>
+            <line x1={12} y1={12} x2={x} y2={y} stroke="#0a0a0a" strokeWidth="0.9" />
+            <circle cx={x} cy={y} r="2" fill="#faf9f5" stroke="#0a0a0a" strokeWidth="1" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
 type Status = 'idle' | 'running' | 'done' | 'error';
 
@@ -62,6 +86,8 @@ export default function Home() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Which tab is showing once a report is loaded (report is the default page 3).
+  const [view, setView] = useState<View>('report');
 
   async function run() {
     if (!sector.trim() || status === 'running') return;
@@ -70,6 +96,7 @@ export default function Home() {
     setData(null);
     setStageIdx(0);
     setProgress(null);
+    setView('report'); // a fresh report always opens on the Report page
 
     // Prefer the live progress stream (real backend events drive the dots).
     // If streaming is unavailable or fails before delivering the report, fall
@@ -211,6 +238,7 @@ export default function Home() {
     setSector('');
     setStageIdx(0);
     setProgress(null);
+    setView('report');
   }
 
   // Inline autocomplete: ghost suffix shown after what the user typed.
@@ -237,12 +265,39 @@ export default function Home() {
     return <Intro onDone={() => setShowIntro(false)} />;
   }
 
+  const NAV: { key: View | 'home'; label: string }[] = [
+    { key: 'home', label: 'Home' },
+    { key: 'report', label: 'Report' },
+    { key: 'excel', label: 'Excel' },
+    { key: 'slides', label: 'Slide Deck' },
+  ];
+
   return (
     <main style={styles.main}>
-      <header style={styles.header}>
-        <div style={styles.brand}>map</div>
+      <header style={{ ...styles.header, ...(status === 'done' ? styles.headerSticky : {}) }}>
+        <button
+          onClick={reset}
+          style={styles.brandBtn}
+          title={status === 'done' ? 'Home — new search' : undefined}
+        >
+          <LogoMark />
+          <span style={styles.brand}>map</span>
+        </button>
         {status === 'done' && (
-          <button onClick={reset} style={styles.newSearch}>← New search</button>
+          <nav style={styles.nav}>
+            {NAV.map((item) => {
+              const active = item.key !== 'home' && view === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => (item.key === 'home' ? reset() : setView(item.key as View))}
+                  style={{ ...styles.navItem, ...(active ? styles.navItemActive : {}) }}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
         )}
       </header>
 
@@ -346,7 +401,9 @@ export default function Home() {
         </section>
       )}
 
-      {status === 'done' && data && <Report data={data} />}
+      {status === 'done' && data && view === 'report' && <Report data={data} />}
+      {status === 'done' && data && view === 'excel' && <ExcelView data={data} />}
+      {status === 'done' && data && view === 'slides' && <SlidesView data={data} />}
 
       {status === 'error' && (
         <section style={styles.hero}>
@@ -375,14 +432,52 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  headerSticky: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 30,
+    background: 'rgba(255,255,255,0.92)',
+    backdropFilter: 'saturate(180%) blur(8px)',
+    WebkitBackdropFilter: 'saturate(180%) blur(8px)',
+    borderBottom: '1px solid #eee',
+    paddingTop: 12,
+    paddingBottom: 12,
+    marginBottom: 8,
+  },
+  brandBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
   },
   brand: { fontSize: 14, fontWeight: 600, letterSpacing: '0.18em' },
-  newSearch: {
-    fontSize: 13,
+  nav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  navItem: {
+    fontSize: 13.5,
+    fontWeight: 500,
     color: '#666',
-    padding: '6px 12px',
-    border: '1px solid #e5e5e5',
+    padding: '7px 14px',
     borderRadius: 999,
+    border: '1px solid transparent',
+    cursor: 'pointer',
+    background: 'none',
+  },
+  navItemActive: {
+    color: '#0a0a0a',
+    fontWeight: 600,
+    background: '#f3f4f6',
+    border: '1px solid #e5e5e5',
   },
   hero: {
     flex: 1,
