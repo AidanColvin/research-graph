@@ -3,6 +3,7 @@
 import React from 'react';
 import { fmtUsd } from '@/components/Report';
 import { computeAnalytics, type CompanyMetrics } from '@/lib/report-analytics';
+import { IsoBars, IsoScatter } from '@/components/Chart3D';
 
 const INDIGO = '#4f46e5';
 const INK = '#0a0a0a';
@@ -26,6 +27,20 @@ export default function VisualsView({ data: rawData }: { data: any }) {
 
       <Card title="Opportunity matrix" caption="Revenue (log) vs partnership priority. Bubble size = trial programs; filled = existing UNC tie. Quadrants split at the medians.">
         <OpportunityMatrix cos={cos} />
+      </Card>
+
+      <Card title="3D opportunity landscape" caption="Three dimensions at once: revenue (depth), R&D intensity (across), and partnership priority (height). Indigo spheres have an existing UNC tie. The tallest spheres toward the front-right are the prime targets.">
+        <IsoScatter
+          xLabel="R&D intensity" yLabel="Priority" zLabel="Revenue"
+          points={cos.filter((c) => c.revenue > 0 && c.rdIntensity != null).map((c) => ({
+            x: c.rdIntensity as number, y: c.priority, z: c.revenue, label: c.name, highlight: c.uncTie,
+          }))}
+        />
+      </Card>
+
+      <Card title="Revenue (3D)" caption="Latest reported revenue as extruded columns — the sector's heavyweights at a glance.">
+        <IsoBars baseColor="#4f46e5" valueFmt={(v) => fmtUsd(v)}
+          items={cos.filter((c) => c.revenue > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 10).map((c) => ({ label: c.name, value: c.revenue }))} />
       </Card>
 
       <Card title="UNC connection network" caption="A relationship diagram: UNC at the center, linked to companies with a documented tie or research overlap. Edge weight = alignment signals; node size = priority.">

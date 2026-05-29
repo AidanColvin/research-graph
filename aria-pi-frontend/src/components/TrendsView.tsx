@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { normalize, fmtUsd } from '@/components/Report';
+import { IsoBars } from '@/components/Chart3D';
 
 const BLUE = '#0891b2';
 const INK = '#0a0a0a';
@@ -58,6 +59,15 @@ export default function TrendsView({ data: rawData }: { data: any }) {
     return { name: p.name, pct: +pct.toFixed(0), cagr: cagr == null ? null : +cagr.toFixed(1), from: a, to: b };
   }).sort((x, y) => y.pct - x.pct);
 
+  // Momentum: recent (last ~3y) revenue CAGR vs the earlier span. Positive
+  // delta = accelerating; negative = slowing.
+  const cagrOf = (a: Pt, b: Pt) => (a.val > 0 && b.val > 0 && b.fy > a.fy ? (Math.pow(b.val / a.val, 1 / (b.fy - a.fy)) - 1) * 100 : null);
+  const momentum = withRev.filter((p) => p.revenue.length >= 5).map((p) => {
+    const r = p.revenue; const last = r[r.length - 1]; const mid = r[r.length - 4]; const first = r[0];
+    const recent = cagrOf(mid, last); const early = cagrOf(first, mid);
+    return { name: p.name, recent, early, delta: recent != null && early != null ? +(recent - early).toFixed(1) : null };
+  }).filter((m) => m.delta != null).sort((a, b) => (b.delta as number) - (a.delta as number)) as { name: string; recent: number; early: number; delta: number }[];
+
   const topByLatest = [...withRev].sort((a, b) => b.revenue[b.revenue.length - 1].val - a.revenue[a.revenue.length - 1].val).slice(0, 6);
   const revSeries: Series[] = topByLatest.map((p, i) => ({ name: p.name, color: PALETTE[i % PALETTE.length], points: p.revenue }));
   // Indexed to 100 at each company's first reported year.
@@ -86,6 +96,10 @@ export default function TrendsView({ data: rawData }: { data: any }) {
         <LineChart series={[{ name: 'Sector revenue', color: BLUE, points: aggRev }]} yFmt={fmtUsd} area />
       </Card>
 
+      <Card title="Sector revenue (3D)" caption="The same trajectory as extruded columns, one per fiscal year — the climb in three dimensions.">
+        <IsoBars baseColor={BLUE} valueFmt={fmtUsd} items={aggRev.map((p) => ({ label: `'${String(p.fy).slice(2)}`, value: p.val }))} />
+      </Card>
+
       <Card title="Revenue by company" caption="The largest firms' annual revenue trajectories — who is climbing and who has plateaued.">
         <LineChart series={revSeries} yFmt={fmtUsd} />
       </Card>
@@ -101,7 +115,38 @@ export default function TrendsView({ data: rawData }: { data: any }) {
       <Card title="Revenue growth: leaders & laggards" caption="Total revenue change over each company's reported span. Green = grew, red = shrank.">
         <GrowthBars rows={growth} />
       </Card>
+
+      {momentum.length > 0 && (
+        <Card title="Growth momentum" caption="Recent revenue CAGR (last ~3 years) minus the earlier span, in percentage points. Green = accelerating; red = slowing.">
+          <MomentumBars rows={momentum} />
+        </Card>
+      )}
     </div>
+  );
+}
+
+function MomentumBars({ rows }: { rows: { name: string; recent: number; early: number; delta: number }[] }) {
+  if (!rows.length) return <Empty />;
+  const W = 820, rowH = 30, pl = 160, pr = 110, top = 12;
+  const H = top + rows.length * rowH + 10;
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(r.delta)), 1);
+  const mid = pl + (W - pl - pr) / 2, half = (W - pl - pr) / 2;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      <line x1={mid} y1={top} x2={mid} y2={H - 10} stroke="#ccc" />
+      {rows.map((r, i) => {
+        const y = top + i * rowH; const w = (Math.abs(r.delta) / maxAbs) * half; const pos = r.delta >= 0;
+        return (
+          <g key={i}>
+            <text x={pl - 8} y={y + rowH / 2 + 4} textAnchor="end" style={st.barLabel}>{r.name}</text>
+            <rect x={pos ? mid : mid - w} y={y + 5} width={w} height={rowH - 12} fill={pos ? GREEN : RED} />
+            <text x={pos ? mid + w + 5 : mid - w - 5} y={y + rowH / 2 + 4} textAnchor={pos ? 'start' : 'end'} style={st.barVal}>
+              {pos ? '+' : ''}{r.delta}pp ({Math.round(r.early)}→{Math.round(r.recent)}%)
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -121,6 +166,7 @@ function Head({ sector }: { sector: string }) {
 
 // ── Line chart ────────────────────────────────────────────────────────────────
 function LineChart({ series, yFmt, area, baseline100 }: { series: Series[]; yFmt: (v: number) => string; area?: boolean; baseline100?: boolean }) {
+  const gid = React.useId().replace(/:/g, '');
   const pts = series.flatMap((s) => s.points);
   if (pts.length < 2) return <Empty />;
   const W = 820, H = 380, pl = 70, pr = 24, pt = 20, pb = 40;
@@ -137,6 +183,14 @@ function LineChart({ series, yFmt, area, baseline100 }: { series: Series[]; yFmt
   return (
     <>
       <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+        <defs>
+          {series.map((s, si) => (
+            <linearGradient key={si} id={`${gid}-${si}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
+            </linearGradient>
+          ))}
+        </defs>
         {/* y grid + labels */}
         {Array.from({ length: yticks + 1 }, (_, i) => {
           const v = y0 + ((y1 - y0) * i) / yticks; const yy = Y(v);
@@ -158,8 +212,8 @@ function LineChart({ series, yFmt, area, baseline100 }: { series: Series[]; yFmt
           const path = sp.map((p, i) => `${i ? 'L' : 'M'} ${X(p.fy).toFixed(1)} ${Y(p.val).toFixed(1)}`).join(' ');
           return (
             <g key={si}>
-              {area && <path d={`${path} L ${X(sp[sp.length - 1].fy)} ${Y(y0)} L ${X(sp[0].fy)} ${Y(y0)} Z`} fill={s.color} fillOpacity={0.08} />}
-              <path d={path} fill="none" stroke={s.color} strokeWidth={2.4} />
+              {area && <path d={`${path} L ${X(sp[sp.length - 1].fy)} ${Y(y0)} L ${X(sp[0].fy)} ${Y(y0)} Z`} fill={`url(#${gid}-${si})`} />}
+              <path d={path} fill="none" stroke={s.color} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" />
               {sp.map((p, i) => <circle key={i} cx={X(p.fy)} cy={Y(p.val)} r={2.6} fill={s.color} />)}
             </g>
           );
