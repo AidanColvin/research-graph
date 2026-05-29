@@ -5,8 +5,9 @@ import Report, { ReportData } from '@/components/Report';
 import Intro from '@/components/Intro';
 import ExcelView from '@/components/ExcelView';
 import SlidesView from '@/components/SlidesView';
+import VisualsView from '@/components/VisualsView';
 
-type View = 'report' | 'excel' | 'slides';
+type View = 'report' | 'excel' | 'slides' | 'visuals';
 
 // Small brand mark shown next to the wordmark (a node-graph glyph echoing the
 // intro). Swap for an <img src="/logo.svg"> if you add a logo file.
@@ -268,6 +269,7 @@ export default function Home() {
   const NAV: { key: View | 'home'; label: string }[] = [
     { key: 'home', label: 'Home' },
     { key: 'report', label: 'Report' },
+    { key: 'visuals', label: 'Visualize' },
     { key: 'excel', label: 'Excel' },
     { key: 'slides', label: 'Slide Deck' },
   ];
@@ -402,6 +404,7 @@ export default function Home() {
       )}
 
       {status === 'done' && data && view === 'report' && <Report data={data} />}
+      {status === 'done' && data && view === 'visuals' && <VisualsView data={data} />}
       {status === 'done' && data && view === 'excel' && <ExcelView data={data} />}
       {status === 'done' && data && view === 'slides' && <SlidesView data={data} />}
 
