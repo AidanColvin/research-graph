@@ -267,7 +267,7 @@ function SourceLink({ url }: { url: string }) {
 function H2({ n, title }: { n: number; title: string }) {
   return (
     <h2 style={styles.h2}>
-      <span style={styles.h2Num}>{n.toString().padStart(2, '0')}</span>
+      {n > 0 && <span style={styles.h2Num}>{n.toString().padStart(2, '0')}</span>}
       {title}
     </h2>
   );
@@ -331,10 +331,10 @@ export function normalize(raw: any): ReportData {
   const s6 = sec('section6_talking_points');
   return {
     report_meta: {
-      sector: d.report_meta?.sector || d.sector || '—',
+      sector: d.report_meta?.sector || d.sector || 'n/a',
       date: d.report_meta?.date || '',
       generated_at: d.report_meta?.generated_at || d._meta?.generated_at || '',
-      prepared_by: d.report_meta?.prepared_by || 'Research Intelligence Team — UNC Chapel Hill',
+      prepared_by: d.report_meta?.prepared_by || 'Research Intelligence Team, UNC Chapel Hill',
       version: d.report_meta?.version || 'Draft',
     },
     section1_overview: {
@@ -355,7 +355,7 @@ export function normalize(raw: any): ReportData {
       excluded: Array.isArray(s3.excluded) ? s3.excluded : [],
     },
     section4_profiles: Array.isArray(d.section4_profiles) ? d.section4_profiles.map((p: any) => ({
-      company_name: p?.company_name || '—',
+      company_name: p?.company_name || 'n/a',
       sector_tag: p?.sector_tag || '',
       nc_based: !!p?.nc_based,
       overview: sourced(p?.overview),
@@ -381,7 +381,7 @@ export function normalize(raw: any): ReportData {
     section6_talking_points: {
       sector_opening: sourced(s6.sector_opening),
       companies: Array.isArray(s6.companies) ? s6.companies.map((c: any) => ({
-        company: c?.company || '—',
+        company: c?.company || 'n/a',
         know_company: sourced(c?.know_company),
         know_pipeline: sourced(c?.know_pipeline),
         know_moves: sourced(c?.know_moves),
@@ -396,13 +396,170 @@ export function normalize(raw: any): ReportData {
   };
 }
 
+// ── Charts & thesis helpers ─────────────────────────────────────────────────
+
+// Parse a formatted money string like "$416.16B (FY2025)" → 416160000000.
+function parseMoney(s?: string): number {
+  if (!s) return 0;
+  const m = s.replace(/[, ]/g, '').match(/\$?(-?\d+(?:\.\d+)?)\s*([BMTK])?/i);
+  if (!m) return 0;
+  let v = parseFloat(m[1]);
+  if (isNaN(v)) return 0;
+  const suf = (m[2] || '').toUpperCase();
+  if (suf === 'T') v *= 1e12;
+  else if (suf === 'B') v *= 1e9;
+  else if (suf === 'M') v *= 1e6;
+  else if (suf === 'K') v *= 1e3;
+  return v;
+}
+
+function fmtUsd(n: number): string {
+  if (!n) return 'n/a';
+  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
+  return `$${n.toFixed(0)}`;
+}
+
+// Reports must never contain em/en dashes. Replace a separator dash (with
+// surrounding spaces) with a comma, a lone dash placeholder with "n/a", and
+// any leftover dash with a plain hyphen. Applied to the whole report payload.
+function noDashStr(s: string): string {
+  const t = s.trim();
+  if (t === '—' || t === '–') return 'n/a';
+  return s
+    .replace(/\s+[—–]\s+/g, ', ')
+    .replace(/[—–]/g, '-');
+}
+
+function deepClean<T>(x: T): T {
+  if (typeof x === 'string') return noDashStr(x) as unknown as T;
+  if (Array.isArray(x)) return x.map((v) => deepClean(v)) as unknown as T;
+  if (x && typeof x === 'object') {
+    const out: any = {};
+    for (const k of Object.keys(x as any)) out[k] = deepClean((x as any)[k]);
+    return out;
+  }
+  return x;
+}
+
+// Horizontal bar chart — best for company-name labels.
+function HBars({ title, subtitle, data, fmt }: {
+  title: string;
+  subtitle?: string;
+  data: { label: string; value: number }[];
+  fmt?: (n: number) => string;
+}) {
+  const rows = data.filter((d) => d.value > 0);
+  if (!rows.length) return null;
+  const max = Math.max(...rows.map((d) => d.value), 1);
+  return (
+    <div style={styles.chartCard}>
+      <div style={styles.chartTitle}>{title}</div>
+      {subtitle && <div style={styles.chartSub}>{subtitle}</div>}
+      <div style={styles.barList}>
+        {rows.map((d, i) => (
+          <div key={i} style={styles.barRow}>
+            <div style={styles.barLabel} title={d.label}>{d.label}</div>
+            <div style={styles.barTrack}>
+              <div style={{ ...styles.barFill, width: `${Math.max(3, (d.value / max) * 100)}%` }} />
+            </div>
+            <div style={styles.barVal}>{fmt ? fmt(d.value) : d.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Simple donut chart for categorical splits.
+function Donut({ title, segments }: {
+  title: string;
+  segments: { label: string; value: number; color: string }[];
+}) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  if (!total) return null;
+  const R = 42;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <div style={styles.chartCard}>
+      <div style={styles.chartTitle}>{title}</div>
+      <div style={styles.donutWrap}>
+        <svg width={116} height={116} viewBox="0 0 120 120" style={{ flexShrink: 0 }}>
+          <g transform="rotate(-90 60 60)">
+            {segments.map((s, i) => {
+              const frac = s.value / total;
+              const dash = frac * C;
+              const seg = (
+                <circle
+                  key={i}
+                  cx={60}
+                  cy={60}
+                  r={R}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={16}
+                  strokeDasharray={`${dash} ${C - dash}`}
+                  strokeDashoffset={-acc * C}
+                />
+              );
+              acc += frac;
+              return seg;
+            })}
+          </g>
+        </svg>
+        <div style={styles.donutLegend}>
+          {segments.map((s, i) => (
+            <div key={i} style={styles.legendRow}>
+              <span style={{ ...styles.legendSwatch, background: s.color }} />
+              <span>{s.label}: <strong>{s.value}</strong></span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Report ───────────────────────────────────────────────────────────────
-export default function Report({ data: rawData }: { data: any }) {
+export default function Report({ data: rawInput }: { data: any }) {
+  // Scrub em/en dashes from the entire payload once, so both the on-screen
+  // report and the downloads (which read rawData) are dash-free.
+  const rawData = React.useMemo(() => deepClean(rawInput), [rawInput]);
   const data = normalize(rawData);
   const m = data.report_meta;
   const v = data._validation;
   const citations = React.useMemo(() => buildCitationIndex(data), [data]);
   const [busy, setBusy] = React.useState<null | 'md' | 'pdf' | 'docx'>(null);
+
+  // ── Aggregates for the thesis + visualizations (all from real report data) ──
+  const profiles = data.section4_profiles || [];
+  const nCos = profiles.length;
+  const tied = profiles.filter((p) => p.existing_unc_tie);
+  const strategic = profiles.filter((p) => p.partnership_type === 'Strategic').length;
+  const translational = nCos - strategic;
+  const ncBased = profiles.filter((p) => p.nc_based).length;
+  const topTied = tied.slice(0, 3).map((p) => p.company_name);
+
+  const revenueData = profiles
+    .map((p) => ({ label: p.company_name, value: parseMoney(p.facts?.['revenue']?.value) }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  const trialsData = profiles
+    .map((p) => ({ label: p.company_name, value: p.pipeline?.length || 0 }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const alignData = profiles
+    .map((p) => ({ label: p.company_name, value: p.unc_alignment?.length || 0 }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const rdData = profiles
+    .map((p) => ({ label: p.company_name, value: parseMoney(p.facts?.['rd expense']?.value || p.facts?.['rd_expense']?.value) }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
 
   async function handleDownload(kind: 'md' | 'pdf' | 'docx') {
     if (busy) return;
@@ -474,6 +631,31 @@ export default function Report({ data: rawData }: { data: any }) {
         )}
       </header>
 
+      {/* THESIS */}
+      {nCos > 0 && (
+        <section style={styles.section}>
+          <H3>Thesis</H3>
+          <p style={styles.claim}>
+            We reviewed <strong>{nCos}</strong> {m.sector} {nCos === 1 ? 'company' : 'companies'} as
+            research partners for UNC Chapel Hill.{' '}
+            <strong>{tied.length}</strong> of <strong>{nCos}</strong> have a documented UNC link: a
+            shared trial, an NIH grant, or a co-authored paper.{' '}
+            <strong>{strategic}</strong> {strategic === 1 ? 'is' : 'are'} large enough to anchor a
+            strategic deal{ncBased > 0 ? <> ({ncBased} based in North Carolina)</> : null}.
+            {topTied.length > 0 && (
+              <> The best first targets are <strong>{topTied.join(', ')}</strong>, where UNC
+              scientists already study related work.</>
+            )}
+          </p>
+          {data.section6_talking_points?.sector_opening?.text && (
+            <p style={styles.claim}>
+              {data.section6_talking_points.sector_opening.text}
+              <Cite urls={data.section6_talking_points.sector_opening.sources} />
+            </p>
+          )}
+        </section>
+      )}
+
       {/* SECTION 1 */}
       <section style={styles.section}>
         <H2 n={1} title="Sector Overview" />
@@ -481,6 +663,12 @@ export default function Report({ data: rawData }: { data: any }) {
         <H3>1.1 Sector Definition and Scale</H3>
         <Claim {...data.section1_overview.definition} />
         <Claim {...data.section1_overview.scale} />
+        {(revenueData.length > 0 || rdData.length > 0) && (
+          <div style={styles.chartGrid}>
+            <HBars title="Annual revenue by company" subtitle="Latest reported, SEC XBRL" data={revenueData} fmt={fmtUsd} />
+            <HBars title="R&D expense by company" subtitle="Latest reported, SEC XBRL" data={rdData} fmt={fmtUsd} />
+          </div>
+        )}
 
         <H3>1.2 Why This Sector Now</H3>
         {data.section1_overview.why_now?.length ? (
@@ -524,6 +712,11 @@ export default function Report({ data: rawData }: { data: any }) {
             ])}
           />
         ) : <Empty label="None identified." />}
+        {alignData.length > 0 && (
+          <div style={styles.chartGridSingle}>
+            <HBars title="UNC alignment signals by company" subtitle="Matched grants, trials, and publications" data={alignData} />
+          </div>
+        )}
 
         <H3>2.2 UNC Faculty with Verified Sector Expertise</H3>
         {data.section2_internal_mapping.unc_faculty?.length ? (
@@ -563,6 +756,25 @@ export default function Report({ data: rawData }: { data: any }) {
       <section style={styles.section}>
         <H2 n={3} title="Company Selection" />
 
+        {nCos > 0 && (
+          <div style={styles.chartGrid}>
+            <Donut
+              title="Existing UNC connection"
+              segments={[
+                { label: 'Existing tie', value: tied.length, color: '#0a0a0a' },
+                { label: 'No documented tie', value: nCos - tied.length, color: '#d4d4d4' },
+              ]}
+            />
+            <Donut
+              title="Partnership scale"
+              segments={[
+                { label: 'Strategic', value: strategic, color: '#0a0a0a' },
+                { label: 'Translational', value: translational, color: '#9a988f' },
+              ]}
+            />
+          </div>
+        )}
+
         <H3>3.2 Companies Selected</H3>
         {data.section3_selection.selected?.length ? (
           <Table
@@ -585,9 +797,14 @@ export default function Report({ data: rawData }: { data: any }) {
         ) : <Empty label="No exclusions recorded." />}
       </section>
 
-      {/* SECTION 4 — Company Profiles */}
+      {/* SECTION 4 - Company Profiles */}
       <section style={styles.section}>
         <H2 n={4} title="Company Profiles" />
+        {trialsData.length > 0 && (
+          <div style={styles.chartGridSingle}>
+            <HBars title="Clinical-trial programs by company" subtitle="Documented on ClinicalTrials.gov" data={trialsData} />
+          </div>
+        )}
         {data.section4_profiles?.map((p, i) => (
           <div key={i} style={styles.profileCard}>
             <div style={styles.profileHeader}>
@@ -754,7 +971,7 @@ export default function Report({ data: rawData }: { data: any }) {
                 <p style={styles.alumniEmpty}>
                   {p.facts?.['cik']
                     ? 'No UNC alumni found in SEC proxy statement biographies for this company.'
-                    : 'Private company — no SEC proxy statements available; alumni data cannot be sourced.'}
+                    : 'Private company. No SEC proxy statements available; alumni data cannot be sourced.'}
                 </p>
               )}
             </div>
@@ -830,19 +1047,19 @@ export default function Report({ data: rawData }: { data: any }) {
           <div key={i} style={styles.tpCard}>
             <h4 style={styles.tpCompany}>{c.company}</h4>
             <div style={styles.tpPoint}>
-              <span style={styles.tpLabel}>1 — Know the company</span>
+              <span style={styles.tpLabel}>1. Know the company</span>
               <Claim {...c.know_company} />
             </div>
             <div style={styles.tpPoint}>
-              <span style={styles.tpLabel}>2 — Know their pipeline</span>
+              <span style={styles.tpLabel}>2. Know their pipeline</span>
               <Claim {...c.know_pipeline} />
             </div>
             <div style={styles.tpPoint}>
-              <span style={styles.tpLabel}>3 — Know their moves</span>
+              <span style={styles.tpLabel}>3. Know their moves</span>
               <Claim {...c.know_moves} />
             </div>
             <div style={styles.tpPoint}>
-              <span style={{ ...styles.tpLabel, color: '#0a0a0a', fontWeight: 700 }}>4 — UNC hook</span>
+              <span style={{ ...styles.tpLabel, color: '#0a0a0a', fontWeight: 700 }}>4. UNC hook</span>
               <Claim {...c.unc_hook} />
             </div>
           </div>
@@ -1281,4 +1498,80 @@ const styles: Record<string, CSSProperties> = {
     fontStyle: 'italic',
     padding: '8px 0',
   },
+
+  // Thesis statement
+  thesisCard: {
+    marginTop: 28,
+    padding: '22px 24px',
+    background: '#0a0a0a',
+    color: '#fff',
+    borderRadius: 14,
+  },
+  thesisLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.18em',
+    textTransform: 'uppercase',
+    color: '#9a988f',
+    marginBottom: 10,
+  },
+  thesisText: {
+    fontSize: 17,
+    lineHeight: 1.6,
+    color: '#fff',
+    fontWeight: 400,
+  },
+  thesisSub: {
+    fontSize: 13,
+    lineHeight: 1.6,
+    color: '#bdbdbd',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTop: '1px solid #2a2a2a',
+  },
+
+  // Visualizations
+  chartGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: 16,
+    margin: '18px 0 10px',
+  },
+  chartGridSingle: {
+    margin: '18px 0 10px',
+    maxWidth: 560,
+  },
+  chartCard: {
+    border: '1px solid #eee',
+    borderRadius: 12,
+    padding: '18px 20px',
+    background: '#fff',
+  },
+  chartTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: '#0a0a0a',
+  },
+  chartSub: { fontSize: 12, color: '#999', marginTop: 2, marginBottom: 14 },
+  barList: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 },
+  barRow: { display: 'flex', alignItems: 'center', gap: 10 },
+  barLabel: {
+    width: 120,
+    fontSize: 12,
+    color: '#374151',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    flexShrink: 0,
+  },
+  barTrack: { flex: 1, height: 10, background: '#f3f4f6', borderRadius: 999, overflow: 'hidden' },
+  barFill: { height: '100%', background: '#0a0a0a', borderRadius: 999 },
+  barVal: { width: 56, textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#0a0a0a', flexShrink: 0 },
+  donutWrap: { display: 'flex', alignItems: 'center', gap: 20, marginTop: 14 },
+  donutLegend: { display: 'flex', flexDirection: 'column', gap: 8 },
+  legendRow: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' },
+  legendSwatch: { width: 12, height: 12, borderRadius: 3, flexShrink: 0, display: 'inline-block' },
+  chartNote: { fontSize: 12, color: '#999', marginTop: 16, lineHeight: 1.6, fontStyle: 'italic' },
 };
