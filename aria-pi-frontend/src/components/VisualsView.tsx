@@ -18,14 +18,18 @@ export default function VisualsView({ data: rawData }: { data: any }) {
         <div style={st.eyebrow}>Visualizations</div>
         <h1 style={st.title}>{a.sector} · visual analysis</h1>
         <p style={st.sub}>
-          Fifteen views of the {a.sector} field, each computed from the searched sector&apos;s own
+          A full visual workup of the {a.sector} field, computed from the searched sector&apos;s own
           companies and figures — positioning, financial structure, concentration, correlation,
-          distribution, ranking, and UNC engagement.
+          distribution, benchmarking, ranking, relationship network, and engagement flow.
         </p>
       </div>
 
       <Card title="Opportunity matrix" caption="Revenue (log) vs partnership priority. Bubble size = trial programs; filled = existing UNC tie. Quadrants split at the medians.">
         <OpportunityMatrix cos={cos} />
+      </Card>
+
+      <Card title="UNC connection network" caption="A relationship diagram: UNC at the center, linked to companies with a documented tie or research overlap. Edge weight = alignment signals; node size = priority.">
+        <ConnectionNetwork cos={cos} />
       </Card>
 
       <Card title="Company × metric heatmap" caption="Each cell shaded by the company's percentile rank for that metric — a fast read on who leads where.">
@@ -36,6 +40,10 @@ export default function VisualsView({ data: rawData }: { data: any }) {
         <Scatter cos={cos} />
       </Card>
 
+      <Card title="Financial bubble" caption="Revenue (log) vs net margin, bubble size = R&D spend. Three financial dimensions at once.">
+        <FinancialBubble cos={cos} />
+      </Card>
+
       <Card title="Metric correlation matrix" caption="Pairwise Pearson correlation across financial metrics. Indigo = positive, red = negative; deeper = stronger.">
         <CorrMatrix m={a.correlationMatrix} />
       </Card>
@@ -44,12 +52,20 @@ export default function VisualsView({ data: rawData }: { data: any }) {
         <Lorenz cos={cos} hhi={a.concentration.hhi} label={a.concentration.label} />
       </Card>
 
+      <Card title="Revenue Pareto" caption="Revenue by company (bars) with the cumulative share line. Where it crosses 80% shows how few firms hold most of the revenue.">
+        <Pareto cos={cos} />
+      </Card>
+
       <Card title="Revenue vs R&D by company" caption="Side-by-side revenue and R&D spend for the largest firms.">
         <GroupedFinancials cos={cos} />
       </Card>
 
       <Card title="Distribution box plots" caption="Five-number summaries: whiskers span min to max, the box covers Q1-Q3, the line marks the median.">
         <BoxPlots a={a} />
+      </Card>
+
+      <Card title="R&D intensity vs sector median" caption="Each company's R&D intensity benchmarked against the sector median. Indigo = above, grey = below.">
+        <DeviationFromMedian cos={cos} med={a.medians.rdIntensity} />
       </Card>
 
       <Card title="Revenue treemap" caption="Area is proportional to each company's latest reported revenue.">
@@ -64,12 +80,24 @@ export default function VisualsView({ data: rawData }: { data: any }) {
         <PriorityStacks cos={cos} />
       </Card>
 
+      <Card title="Priority by partnership type" caption="Each company plotted by priority within its scale tier; the marker is the group mean.">
+        <PriorityDots cos={cos} />
+      </Card>
+
+      <Card title="UNC footprint composition" caption="Stacked UNC engagement per company: trials, alignment signals, partners, and alumni found.">
+        <EngagementComposition cos={cos} />
+      </Card>
+
       <Card title="Net margin spread" caption="Profitability by company, diverging from break-even. Red = loss-making.">
         <DivergingMargin cos={cos} />
       </Card>
 
       <Card title="R&D intensity distribution" caption="Companies per R&D-intensity band; the top band is an overflow bucket.">
         <Histogram cos={cos} />
+      </Card>
+
+      <Card title="Net margin distribution" caption="How profitability is spread across the sector, including loss-making firms.">
+        <MarginHistogram cos={cos} />
       </Card>
 
       <Card title="Leader profiles (radar)" caption="Top three by priority across five normalized dimensions. Each axis is scaled 0-1 against the set.">
@@ -82,6 +110,10 @@ export default function VisualsView({ data: rawData }: { data: any }) {
 
       <Card title="Engagement funnel" caption="The set narrows from all companies to the actionable shortlist.">
         <Funnel a={a} />
+      </Card>
+
+      <Card title="Engagement flow" caption="How the set splits, left to right: scale → existing UNC tie → priority tier. Ribbon width = number of companies.">
+        <Sankey cos={cos} />
       </Card>
     </div>
   );
@@ -570,6 +602,258 @@ function Funnel({ a }: { a: ReturnType<typeof computeAnalytics> }) {
           </g>
         );
       })}
+    </svg>
+  );
+}
+
+// ── 16. UNC connection network (diagram) ─────────────────────────────────────
+function ConnectionNetwork({ cos }: { cos: CompanyMetrics[] }) {
+  const nodes = cos.filter((c) => c.uncTie || c.alignment > 0);
+  if (!nodes.length) return <Empty />;
+  const W = 820, H = 560, cx = W / 2, cy = H / 2, R = 210;
+  const maxAlign = Math.max(...nodes.map((n) => n.alignment), 1);
+  const pos = nodes.map((_, i) => { const ang = -Math.PI / 2 + (i / nodes.length) * Math.PI * 2; return [cx + R * Math.cos(ang), cy + R * Math.sin(ang)]; });
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      {nodes.map((n, i) => (
+        <line key={`e${i}`} x1={cx} y1={cy} x2={pos[i][0]} y2={pos[i][1]}
+          stroke={n.uncTie ? INDIGO : '#d4d4d4'} strokeWidth={1 + (n.alignment / maxAlign) * 6} strokeOpacity={0.55} />
+      ))}
+      {nodes.map((n, i) => {
+        const [x, y] = pos[i]; const r = 6 + n.priority / 8; const out = x >= cx;
+        return (
+          <g key={`n${i}`}>
+            <circle cx={x} cy={y} r={r} fill={n.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={n.uncTie ? 0.85 : 1} />
+            <text x={out ? x + r + 4 : x - r - 4} y={y + 4} textAnchor={out ? 'start' : 'end'} style={st.pointLabel}>{n.name}</text>
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cy} r={42} fill={INK} />
+      <text x={cx} y={cy + 5} textAnchor="middle" style={{ fontSize: 18, fill: '#fff', fontWeight: 700 }}>UNC</text>
+    </svg>
+  );
+}
+
+// ── 17. Financial bubble ──────────────────────────────────────────────────────
+function FinancialBubble({ cos }: { cos: CompanyMetrics[] }) {
+  const pts = cos.filter((c) => c.revenue > 0 && c.netMargin != null) as (CompanyMetrics & { netMargin: number })[];
+  if (pts.length < 2) return <Empty />;
+  const W = 820, H = 460, pl = 56, pr = 30, pt = 24, pb = 48;
+  const xs = pts.map((c) => Math.log10(c.revenue));
+  const X = (c: CompanyMetrics) => lin(Math.log10(c.revenue), Math.min(...xs), Math.max(...xs), pl, W - pr);
+  const yMin = Math.min(...pts.map((c) => c.netMargin), 0), yMax = Math.max(...pts.map((c) => c.netMargin), 5);
+  const Y = (v: number) => lin(v, yMin, yMax, H - pb, pt);
+  const maxRd = Math.max(...pts.map((c) => c.rd), 1);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      <line x1={pl} y1={Y(0)} x2={W - pr} y2={Y(0)} stroke="#bbb" strokeDasharray="4 4" />
+      <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#ccc" />
+      <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#ccc" />
+      <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>Revenue (log) →</text>
+      <text x={14} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 14 ${(pt + H - pb) / 2})`}>Net margin % →</text>
+      {pts.map((c, i) => (
+        <g key={i}>
+          <circle cx={X(c)} cy={Y(c.netMargin)} r={5 + Math.sqrt(c.rd / maxRd) * 22} fill={INDIGO} fillOpacity={0.28} stroke={INDIGO} />
+          <text x={X(c)} y={Y(c.netMargin) + 3} textAnchor="middle" style={{ fontSize: 9, fill: '#1f2937' }}>{c.name.split(' ')[0]}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── 18. Revenue Pareto ────────────────────────────────────────────────────────
+function Pareto({ cos }: { cos: CompanyMetrics[] }) {
+  const items = cos.filter((c) => c.revenue > 0).sort((a, b) => b.revenue - a.revenue);
+  if (items.length < 2) return <Empty />;
+  const total = items.reduce((s, c) => s + c.revenue, 0);
+  const W = 820, H = 400, pl = 50, pr = 50, pt = 20, pb = 70;
+  const bw = (W - pl - pr) / items.length;
+  const max = items[0].revenue;
+  let cum = 0;
+  const linePts = items.map((c, i) => { cum += c.revenue; return [pl + i * bw + bw / 2, lin(cum / total, 0, 1, H - pb, pt)]; });
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      <line x1={pl} y1={lin(0.8, 0, 1, H - pb, pt)} x2={W - pr} y2={lin(0.8, 0, 1, H - pb, pt)} stroke="#e0a" strokeOpacity={0.3} strokeDasharray="4 4" />
+      <text x={W - pr} y={lin(0.8, 0, 1, H - pb, pt) - 4} textAnchor="end" style={st.quad}>80%</text>
+      {items.map((c, i) => {
+        const h = (c.revenue / max) * (H - pt - pb); const x = pl + i * bw;
+        return (
+          <g key={i}>
+            <rect x={x + 2} y={H - pb - h} width={bw - 4} height={h} fill={INDIGO} fillOpacity={0.8} />
+            <text x={x + bw / 2} y={H - pb + 12} textAnchor="end" style={{ ...st.axisSm }} transform={`rotate(-40 ${x + bw / 2} ${H - pb + 12})`}>{c.name}</text>
+          </g>
+        );
+      })}
+      <polyline points={linePts.map((p) => p.join(',')).join(' ')} fill="none" stroke={INK} strokeWidth={2} />
+      {linePts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill={INK} />)}
+      <text x={W - pr + 6} y={pt + 6} style={st.axisSm}>100%</text>
+    </svg>
+  );
+}
+
+// ── 19. Deviation from sector median ─────────────────────────────────────────
+function DeviationFromMedian({ cos, med }: { cos: CompanyMetrics[]; med: number | null }) {
+  if (med == null) return <Empty />;
+  const items = cos.filter((c) => c.rdIntensity != null).sort((a, b) => (b.rdIntensity! - a.rdIntensity!)) as (CompanyMetrics & { rdIntensity: number })[];
+  if (!items.length) return <Empty />;
+  const W = 820, rowH = 26, pl = 150, pr = 60, top = 16;
+  const H = top + items.length * rowH + 10;
+  const maxAbs = Math.max(...items.map((c) => Math.abs(c.rdIntensity - med)), 1);
+  const mid = pl + (W - pl - pr) / 2, half = (W - pl - pr) / 2;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      <line x1={mid} y1={top} x2={mid} y2={H - 10} stroke="#ccc" />
+      <text x={mid} y={H - 2} textAnchor="middle" style={st.axisSm}>median {med}%</text>
+      {items.map((c, i) => {
+        const dev = c.rdIntensity - med; const y = top + i * rowH; const w = (Math.abs(dev) / maxAbs) * half; const pos = dev >= 0;
+        return (
+          <g key={i}>
+            <text x={pl - 8} y={y + rowH / 2 + 4} textAnchor="end" style={st.barLabel}>{c.name}</text>
+            <rect x={pos ? mid : mid - w} y={y + 5} width={w} height={rowH - 12} fill={pos ? INDIGO : '#cbcbcb'} />
+            <text x={pos ? mid + w + 5 : mid - w - 5} y={y + rowH / 2 + 4} textAnchor={pos ? 'start' : 'end'} style={st.barVal}>{dev > 0 ? '+' : ''}{dev.toFixed(1)}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── 20. Priority dots by partnership type ────────────────────────────────────
+function PriorityDots({ cos }: { cos: CompanyMetrics[] }) {
+  const groups = [
+    { key: 'Strategic', cos: cos.filter((c) => c.partnershipType === 'Strategic') },
+    { key: 'Translational', cos: cos.filter((c) => c.partnershipType !== 'Strategic') },
+  ].filter((g) => g.cos.length);
+  if (!groups.length) return <Empty />;
+  const W = 820, pl = 130, pr = 30, top = 20, laneH = 90;
+  const H = top + groups.length * laneH;
+  const X = (v: number) => lin(v, 0, 100, pl, W - pr);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      {[0, 25, 50, 75, 100].map((t) => <text key={t} x={X(t)} y={H - 4} textAnchor="middle" style={st.axisSm}>{t}</text>)}
+      {groups.map((g, gi) => {
+        const cy = top + gi * laneH + laneH / 2;
+        const mean = g.cos.reduce((s, c) => s + c.priority, 0) / g.cos.length;
+        return (
+          <g key={gi}>
+            <text x={pl - 10} y={cy + 4} textAnchor="end" style={st.barLabel}>{g.key} ({g.cos.length})</text>
+            <line x1={pl} y1={cy} x2={W - pr} y2={cy} stroke="#eee" />
+            <line x1={X(mean)} y1={cy - 24} x2={X(mean)} y2={cy + 24} stroke={INK} strokeDasharray="3 3" />
+            <text x={X(mean)} y={cy - 28} textAnchor="middle" style={st.axisSm}>mean {Math.round(mean)}</text>
+            {g.cos.map((c, i) => <circle key={i} cx={X(c.priority)} cy={cy + ((i % 3) - 1) * 9} r={6} fill={INDIGO} fillOpacity={0.6} />)}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── 21. UNC footprint composition ────────────────────────────────────────────
+function EngagementComposition({ cos }: { cos: CompanyMetrics[] }) {
+  const segs = [
+    { label: 'Trials', color: '#312e81', val: (c: CompanyMetrics) => c.trials },
+    { label: 'Alignment', color: '#4f46e5', val: (c: CompanyMetrics) => c.alignment },
+    { label: 'Partners', color: '#818cf8', val: (c: CompanyMetrics) => c.partners },
+    { label: 'Alumni', color: '#c7d2fe', val: (c: CompanyMetrics) => c.alumni },
+  ];
+  const tot = (c: CompanyMetrics) => segs.reduce((s, sg) => s + sg.val(c), 0);
+  const items = [...cos].filter((c) => tot(c) > 0).sort((a, b) => tot(b) - tot(a)).slice(0, 12);
+  if (!items.length) return <Empty />;
+  const max = Math.max(...items.map(tot), 1);
+  const W = 820, rowH = 28, pl = 150, pr = 50, top = 10;
+  const H = top + items.length * rowH + 6;
+  const Xw = (v: number) => (v / max) * (W - pl - pr);
+  return (
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+        {items.map((c, i) => {
+          let x = pl; const y = top + i * rowH;
+          return (
+            <g key={i}>
+              <text x={pl - 8} y={y + rowH / 2 + 4} textAnchor="end" style={st.barLabel}>{c.name}</text>
+              {segs.map((sg) => { const w = Xw(sg.val(c)); const r = w > 0 ? <rect key={sg.label} x={x} y={y + 5} width={w} height={rowH - 12} fill={sg.color} /> : null; x += w; return r; })}
+              <text x={x + 6} y={y + rowH / 2 + 4} style={st.barVal}>{tot(c)}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <Legend items={segs.map((sg) => ({ label: sg.label, color: sg.color }))} />
+    </>
+  );
+}
+
+// ── 22. Net margin distribution ──────────────────────────────────────────────
+function MarginHistogram({ cos }: { cos: CompanyMetrics[] }) {
+  const vals = cos.map((c) => c.netMargin).filter((v): v is number => v != null);
+  if (vals.length < 2) return <Empty />;
+  const lo = Math.min(...vals, 0), hi = Math.max(...vals, 0);
+  const nbins = 8, binW = (hi - lo) / nbins || 1;
+  const bins = Array.from({ length: nbins }, (_, i) => ({ lo: lo + i * binW, n: 0 }));
+  vals.forEach((v) => { bins[Math.min(nbins - 1, Math.floor((v - lo) / binW))].n++; });
+  const W = 820, H = 360, pl = 40, pr = 20, pt = 20, pb = 44;
+  const maxN = Math.max(...bins.map((b) => b.n), 1); const bw = (W - pl - pr) / nbins;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#ccc" />
+      {bins.map((b, i) => {
+        const h = (b.n / maxN) * (H - pt - pb); const x = pl + i * bw;
+        return (
+          <g key={i}>
+            <rect x={x + 3} y={H - pb - h} width={bw - 6} height={h} fill={b.lo < 0 ? RED : INDIGO} fillOpacity={0.8} />
+            {b.n > 0 && <text x={x + bw / 2} y={H - pb - h - 6} textAnchor="middle" style={st.barVal}>{b.n}</text>}
+            <text x={x + bw / 2} y={H - pb + 16} textAnchor="middle" style={st.axisSm}>{Math.round(b.lo)}%</text>
+          </g>
+        );
+      })}
+      <text x={(pl + W - pr) / 2} y={H - 6} textAnchor="middle" style={st.axis}>Net margin band</text>
+    </svg>
+  );
+}
+
+// ── 23. Engagement flow (Sankey) ─────────────────────────────────────────────
+function Sankey({ cos }: { cos: CompanyMetrics[] }) {
+  const N = cos.length;
+  if (!N) return <Empty />;
+  const W = 820, H = 440, pad = 18, gap = 16, nodeW = 14;
+  const usableH = H - pad * 2 - gap * 2;
+  const tier = (c: CompanyMetrics) => (c.priority >= 60 ? 'High' : c.priority >= 30 ? 'Medium' : 'Low');
+  const mk = (defs: { key: string; test: (c: CompanyMetrics) => boolean }[]) =>
+    defs.map((d) => ({ key: d.key, members: cos.filter(d.test) })).filter((n) => n.members.length);
+  const col0 = mk([{ key: 'Strategic', test: (c) => c.partnershipType === 'Strategic' }, { key: 'Translational', test: (c) => c.partnershipType !== 'Strategic' }]);
+  const col1 = mk([{ key: 'Existing tie', test: (c) => c.uncTie }, { key: 'No tie', test: (c) => !c.uncTie }]);
+  const col2 = mk([{ key: 'High', test: (c) => tier(c) === 'High' }, { key: 'Medium', test: (c) => tier(c) === 'Medium' }, { key: 'Low', test: (c) => tier(c) === 'Low' }]);
+  const colX = [60, W / 2 - nodeW / 2, W - 60 - nodeW];
+  type Node = { key: string; members: CompanyMetrics[]; x: number; y: number; h: number; inUsed: number; outUsed: number };
+  const layout = (nodes: typeof col0, x: number): Node[] => {
+    let y = pad;
+    return nodes.map((n) => { const h = (n.members.length / N) * usableH; const o = { ...n, x, y, h, inUsed: 0, outUsed: 0 }; y += h + gap; return o; });
+  };
+  const c0 = layout(col0, colX[0]), c1 = layout(col1, colX[1]), c2 = layout(col2, colX[2]);
+  const ribbons: { d: string }[] = [];
+  const link = (s: Node, t: Node, members: CompanyMetrics[]) => {
+    const v = members.length; if (!v) return;
+    const lh = (v / N) * usableH;
+    const sy = s.y + s.outUsed; s.outUsed += lh;
+    const ty = t.y + t.inUsed; t.inUsed += lh;
+    const x1 = s.x + nodeW, x2 = t.x, xm = (x1 + x2) / 2;
+    ribbons.push({ d: `M ${x1} ${sy} C ${xm} ${sy} ${xm} ${ty} ${x2} ${ty} L ${x2} ${ty + lh} C ${xm} ${ty + lh} ${xm} ${sy + lh} ${x1} ${sy + lh} Z` });
+  };
+  c0.forEach((s) => c1.forEach((t) => link(s, t, s.members.filter((c) => t.members.includes(c)))));
+  c1.forEach((s) => c2.forEach((t) => link(s, t, s.members.filter((c) => t.members.includes(c)))));
+  const allNodes = [...c0, ...c1, ...c2];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
+      {ribbons.map((r, i) => <path key={i} d={r.d} fill={INDIGO} fillOpacity={0.18} />)}
+      {allNodes.map((n, i) => (
+        <g key={i}>
+          <rect x={n.x} y={n.y} width={nodeW} height={Math.max(2, n.h)} fill={INK} />
+          <text x={n.x === colX[2] ? n.x + nodeW + 6 : n.x === colX[0] ? n.x - 6 : n.x + nodeW + 6}
+            y={n.y + n.h / 2 + 4} textAnchor={n.x === colX[0] ? 'end' : 'start'} style={st.barLabel}>{n.key} ({n.members.length})</text>
+        </g>
+      ))}
+      <text x={colX[0]} y={12} textAnchor="middle" style={st.axisSm}>Scale</text>
+      <text x={colX[1] + nodeW / 2} y={12} textAnchor="middle" style={st.axisSm}>UNC tie</text>
+      <text x={colX[2] + nodeW} y={12} textAnchor="end" style={st.axisSm}>Priority</text>
     </svg>
   );
 }
