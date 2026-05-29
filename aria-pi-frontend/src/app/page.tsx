@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Report, { ReportData } from '@/components/Report';
+import Intro from '@/components/Intro';
 
 type Status = 'idle' | 'running' | 'done' | 'error';
 
@@ -47,6 +48,8 @@ function suggestFor(input: string): string {
 }
 
 export default function Home() {
+  // Plays the network-graph intro once on first load, then reveals the app.
+  const [showIntro, setShowIntro] = useState(true);
   const [sector, setSector] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [stageIdx, setStageIdx] = useState(0);
@@ -138,6 +141,11 @@ export default function Home() {
       e.preventDefault();
       setSector(suggestion);
     }
+  }
+
+  // Intro plays first; once it finishes (or is skipped) the original app shows.
+  if (showIntro) {
+    return <Intro onDone={() => setShowIntro(false)} />;
   }
 
   return (
