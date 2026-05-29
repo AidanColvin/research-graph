@@ -4,6 +4,7 @@ Uses two SEC endpoints:
   1. efts.sec.gov/LATEST/search-index  — full-text filing search
   2. data.sec.gov/submissions/CIK{cik}.json  — rich company submissions
 """
+import html as _html
 import re
 import time
 import requests
@@ -297,6 +298,39 @@ class SECEdgarClient:
             "shares_outstanding": latest_annual("EntityCommonStockSharesOutstanding", "shares", source=dei),
         }
 
+    def get_unc_alumni_from_proxy(self, proxy_filings: list) -> list:
+        """Fetch DEF 14A proxy statements and return UNC-educated executives/directors."""
+        alumni: list = []
+        seen: set = set()
+        for filing in proxy_filings[:2]:
+            url = filing.get('url', '')
+            if not url or 'browse-edgar' in url:
+                continue
+            try:
+                r = requests.get(
+                    url,
+                    headers={'User-Agent': USER_AGENT},
+                    timeout=12,
+                    stream=True,
+                )
+                r.raise_for_status()
+                chunks, size = [], 0
+                for chunk in r.iter_content(chunk_size=16_384):
+                    chunks.append(chunk)
+                    size += len(chunk)
+                    if size >= 400_000:
+                        break
+                raw = b''.join(chunks).decode('utf-8', errors='ignore')
+            except Exception as e:
+                print(f'DEF 14A fetch error ({url}): {e}')
+                continue
+            for person in _parse_proxy_for_unc(raw, url):
+                key = person['name'].lower().strip()
+                if key and key not in seen:
+                    seen.add(key)
+                    alumni.append(person)
+        return alumni[:8]
+
     def _find_cik(self, company_name: str) -> Optional[str]:
         """Resolve a company name → CIK using SEC's official ticker map first,
         then fall back to full-text search."""
@@ -359,6 +393,135 @@ class SECEdgarClient:
         except Exception as e:
             print(f"SEC search error: {e}")
             return None
+
+
+# ── DEF 14A proxy-statement UNC alumni parsing ──────────────────────────────
+
+_UNC_RE = re.compile(
+    r'University\s+of\s+North\s+Carolina(?:\s+at\s+Chapel\s+Hill)?'
+    r'|UNC[\s\-]?Chapel\s+Hill'
+    r'|UNC\s+School\s+of\s+(?:Medicine|Law|Business|Pharmacy|Nursing|Dentistry)'
+    r'|Kenan[\s\-]Flagler(?:\s+Business\s+School)?'
+    r'|Gillings\s+School(?:\s+of\s+Global\s+Public\s+Health)?'
+    r'|UNC\s+Eshelman\s+School\s+of\s+Pharmacy'
+    r'|UNC\s+Lineberger',
+    re.IGNORECASE,
+)
+
+_EDU_CTX_RE = re.compile(
+    r'\b(?:received?|earned?|graduated?|attended?|'
+    r'degree\s+(?:from|in|at)|'
+    r'B\.?[AS]\.?|M\.?B\.?A\.?|M\.?[SA]\.?|J\.?D\.?|Ph\.?D\.?|M\.?D\.?|'
+    r'bachelor|master|doctoral|law\s+degree|medical\s+school|'
+    r'undergraduate|graduate\s+degree|postgraduate|studied|majored)\b',
+    re.IGNORECASE,
+)
+
+_DEGREE_RE = [
+    (re.compile(r'\b(?:Ph\.?D\.?|Doctor(?:al|ate)|Sc\.?D\.?)\b', re.I), 'PhD'),
+    (re.compile(r'\b(?:M\.?D\.?|Doctor\s+of\s+Medicine|Medical\s+degree)\b', re.I), 'MD'),
+    (re.compile(r'\b(?:J\.?D\.?|Doctor\s+of\s+Jurisprudence|Law\s+degree)\b', re.I), 'JD'),
+    (re.compile(r'\b(?:M\.?B\.?A\.?|Master\s+of\s+Business)\b', re.I), 'MBA'),
+    (re.compile(r'\b(?:M\.?S\.?|M\.?A\.?|M\.?Eng\.?|Master(?:\'?s)?)\b', re.I), "Master's"),
+    (re.compile(r"\b(?:B\.?S\.?|B\.?A\.?|A\.?B\.?|Bachelor(?:'?s)?)\b", re.I), "Bachelor's"),
+]
+
+_TITLE_RE = [
+    (re.compile(r'Chief\s+Executive\s+Officer|\bCEO\b', re.I), 'Chief Executive Officer'),
+    (re.compile(r'President\s+(?:and|&)\s+Chief\s+Executive', re.I), 'President & CEO'),
+    (re.compile(r'Chief\s+Financial\s+Officer|\bCFO\b', re.I), 'Chief Financial Officer'),
+    (re.compile(r'Chief\s+Operating\s+Officer|\bCOO\b', re.I), 'Chief Operating Officer'),
+    (re.compile(r'Chief\s+Technology\s+Officer|\bCTO\b', re.I), 'Chief Technology Officer'),
+    (re.compile(r'Chief\s+Medical\s+Officer|\bCMO\b', re.I), 'Chief Medical Officer'),
+    (re.compile(r'Chief\s+Scientific\s+Officer|\bCSO\b', re.I), 'Chief Scientific Officer'),
+    (re.compile(r'Chief\s+Legal\s+Officer|General\s+Counsel', re.I), 'General Counsel'),
+    (re.compile(r'Chief\s+Commercial\s+Officer', re.I), 'Chief Commercial Officer'),
+    (re.compile(r'\bPresident\b(?!\s+of\s+the\s+(?:United|Board))', re.I), 'President'),
+    (re.compile(r'Executive\s+Vice\s+President', re.I), 'Executive Vice President'),
+    (re.compile(r'Senior\s+Vice\s+President', re.I), 'Senior Vice President'),
+    (re.compile(r'Vice\s+President', re.I), 'Vice President'),
+    (re.compile(r'Chair(?:man|woman|person)?\s+of\s+the\s+Board|Board\s+Chair', re.I), 'Board Chair'),
+    (re.compile(r'Lead\s+Independent\s+Director', re.I), 'Lead Independent Director'),
+    (re.compile(r'Independent\s+Director', re.I), 'Independent Director'),
+    (re.compile(r'\bDirector\b', re.I), 'Director'),
+]
+
+
+def _strip_proxy_html(text: str) -> str:
+    text = re.sub(r'<script[^>]*?>.*?</script>', ' ', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<style[^>]*?>.*?</style>', ' ', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = _html.unescape(text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def _proxy_exec_name(window: str) -> str:
+    # "FirstName [Middle] LastName, age NN" — standard proxy bio opener
+    m = re.search(
+        r'\b([A-Z][a-z]+(?:\s+[A-Z]\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+        r'(?:,?\s+(?:age\s+)?\d{2}\b|\s+\(\d{2}\))',
+        window,
+    )
+    if m:
+        return m.group(1).strip()
+    # ALL-CAPS name (older SEC format)
+    m = re.search(r'\b([A-Z]{2,}(?:\s+[A-Z]{2,}){1,3})\b', window)
+    if m and len(m.group(1)) > 4:
+        return m.group(1).title()
+    # "Mr./Ms./Dr. Name"
+    m = re.search(
+        r'\b(?:Mr\.|Ms\.|Dr\.|Mrs\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b',
+        window,
+    )
+    if m:
+        return m.group(1).strip()
+    return ''
+
+
+def _proxy_exec_title(window: str) -> str:
+    for pat, label in _TITLE_RE:
+        if pat.search(window):
+            return label
+    return ''
+
+
+def _proxy_unc_degree(context: str) -> str:
+    for pat, label in _DEGREE_RE:
+        if pat.search(context):
+            return label
+    return ''
+
+
+def _parse_proxy_for_unc(html_text: str, source_url: str) -> list:
+    """Return [{name, title, unc_credential, source_url}] for UNC-educated execs."""
+    text = _strip_proxy_html(html_text)
+    results: list = []
+    for m in _UNC_RE.finditer(text):
+        # Require an educational keyword within 200 chars of the UNC mention
+        ctx_start = max(0, m.start() - 200)
+        ctx_end = min(len(text), m.end() + 100)
+        if not _EDU_CTX_RE.search(text[ctx_start:ctx_end]):
+            continue
+        win_start = max(0, m.start() - 900)
+        win_end = min(len(text), m.end() + 200)
+        window = text[win_start:win_end]
+        name = _proxy_exec_name(window)
+        if not name or len(name.split()) < 2:
+            continue
+        title = _proxy_exec_title(window)
+        degree = _proxy_unc_degree(text[ctx_start:ctx_end])
+        credential = 'UNC Chapel Hill'
+        if degree:
+            credential += f' — {degree}'
+        results.append({
+            'name': name,
+            'title': title or 'Executive / Director',
+            'unc_credential': credential,
+            'source_url': source_url,
+        })
+    return results
 
 
 def _filing_url(cik: str, accession: str, doc: str) -> str:

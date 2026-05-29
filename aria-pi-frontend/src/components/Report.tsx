@@ -27,6 +27,7 @@ export type ReportData = {
   };
   section4_profiles: {
     company_name: string;
+    sector_tag?: string;
     overview: Sourced;
     partnership_type: string;
     existing_unc_tie: boolean;
@@ -37,6 +38,15 @@ export type ReportData = {
     unc_alignment: { company_program: string; unc_unit: string; company_fact: string; unc_fact: string; rationale: string; sources: SourceList }[];
     what_unc_offers: { offering: string; description: string; sources: SourceList }[];
     signals: { signal: string; sources: SourceList }[];
+    unc_alumni: {
+      name: string;
+      title: string;
+      unc_credential: string;
+      linkedin_url: string;
+      company_profile_url: string;
+      edgar_url: string;
+      source_url: string;
+    }[];
   }[];
   section5_value_prop: {
     data_assets: { name: string; description: string; relevance: string; sources: SourceList }[];
@@ -345,6 +355,7 @@ export function normalize(raw: any): ReportData {
     },
     section4_profiles: Array.isArray(d.section4_profiles) ? d.section4_profiles.map((p: any) => ({
       company_name: p?.company_name || '—',
+      sector_tag: p?.sector_tag || '',
       overview: sourced(p?.overview),
       partnership_type: p?.partnership_type || 'Unknown',
       existing_unc_tie: !!p?.existing_unc_tie,
@@ -355,6 +366,7 @@ export function normalize(raw: any): ReportData {
       unc_alignment: Array.isArray(p?.unc_alignment) ? p.unc_alignment : [],
       what_unc_offers: Array.isArray(p?.what_unc_offers) ? p.what_unc_offers : [],
       signals: Array.isArray(p?.signals) ? p.signals : [],
+      unc_alumni: Array.isArray(p?.unc_alumni) ? p.unc_alumni : [],
     })) : [],
     section5_value_prop: {
       data_assets: Array.isArray(s5.data_assets) ? s5.data_assets : [],
@@ -690,6 +702,54 @@ export default function Report({ data: rawData }: { data: any }) {
                 ))}
               </ul>
             ) : <Empty label="No recent signals documented." />}
+
+            {/* UNC Alumni in Leadership */}
+            <div style={styles.alumniBlock}>
+              <div style={styles.alumniHeader}>
+                <span style={styles.alumniCompany}>{p.company_name}</span>
+                {p.sector_tag && (
+                  <span style={styles.sectorTag}>{p.sector_tag}</span>
+                )}
+              </div>
+              <div style={styles.alumniTitle}>UNC Alumni in Leadership</div>
+              {p.unc_alumni?.length ? (
+                <div style={styles.alumniCards}>
+                  {p.unc_alumni.map((a, j) => (
+                    <div key={j} style={styles.alumniCard}>
+                      <div style={styles.alumniName}>{a.name}</div>
+                      <div style={styles.alumniRole}>{a.title}</div>
+                      <div style={styles.alumniCredential}>
+                        <span style={styles.alumniPill}>UNC Alumni</span>
+                        {a.unc_credential}
+                      </div>
+                      <div style={styles.alumniLinks}>
+                        <a
+                          href={a.linkedin_url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          style={styles.alumniLink}
+                        >
+                          LinkedIn ↗
+                        </a>
+                        <a
+                          href={a.company_profile_url || a.edgar_url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          style={styles.alumniLink}
+                        >
+                          Company Profile ↗
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={styles.alumniEmpty}>
+                  No UNC alumni identified in proxy filings for this company.
+                  {!p.facts?.['cik'] && ' (Private company — no SEC proxy statements available.)'}
+                </p>
+              )}
+            </div>
           </div>
         ))}
       </section>
@@ -1116,4 +1176,101 @@ const styles: Record<string, CSSProperties> = {
   },
   citeLink: { color: 'inherit', textDecoration: 'none' },
   sourceLink: { color: '#1e40af', textDecoration: 'none' },
+  alumniBlock: {
+    marginTop: 32,
+    borderTop: '2px solid #0a0a0a',
+    paddingTop: 20,
+  },
+  alumniHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    flexWrap: 'wrap',
+  },
+  alumniCompany: {
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: '-0.01em',
+    color: '#0a0a0a',
+  },
+  sectorTag: {
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.06em',
+    padding: '3px 10px',
+    borderRadius: 999,
+    background: '#e0e7ff',
+    color: '#3730a3',
+    textTransform: 'uppercase',
+  },
+  alumniTitle: {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.12em',
+    color: '#999',
+    textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+  alumniCards: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+    gap: 12,
+  },
+  alumniCard: {
+    border: '1px solid #e5e5e5',
+    borderRadius: 10,
+    padding: '14px 16px',
+    background: '#fafafa',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  alumniName: {
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: '-0.01em',
+    color: '#0a0a0a',
+  },
+  alumniRole: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  alumniCredential: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 12,
+    color: '#374151',
+    flexWrap: 'wrap',
+  },
+  alumniPill: {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    padding: '2px 7px',
+    borderRadius: 999,
+    background: '#dcfce7',
+    color: '#166534',
+    textTransform: 'uppercase',
+    flexShrink: 0,
+  },
+  alumniLinks: {
+    display: 'flex',
+    gap: 12,
+    marginTop: 8,
+  },
+  alumniLink: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#1e40af',
+    textDecoration: 'none',
+  },
+  alumniEmpty: {
+    fontSize: 13,
+    color: '#999',
+    fontStyle: 'italic',
+    padding: '8px 0',
+  },
 };

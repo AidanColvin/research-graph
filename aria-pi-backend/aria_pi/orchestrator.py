@@ -151,7 +151,7 @@ def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
 def _empty_company(name: str) -> dict:
     return {"name": name, "facts": {"legal_name": name, "source": "https://www.sec.gov"},
             "trials": [], "unc_trials": [], "pubmed": [], "pubmed_coi": [],
-            "nih_grants": []}
+            "nih_grants": [], "unc_alumni": []}
 
 
 def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
@@ -195,6 +195,14 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
 
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
+
+    # Alumni fetch runs after facts — needs the DEF 14A URLs from facts
+    proxy_filings = (results["facts"].get("filings_by_form") or {}).get("DEF 14A", [])
+    unc_alumni = safe(
+        lambda: sec.get_unc_alumni_from_proxy(proxy_filings),
+        "Alumni", [],
+    ) if proxy_filings else []
+
     return {
         "name": name,
         "facts": results["facts"],
@@ -203,6 +211,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "pubmed": results["pubmed"],
         "pubmed_coi": [],
         "nih_grants": results["nih_grants"],
+        "unc_alumni": unc_alumni,
     }
 
 

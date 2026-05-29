@@ -14,6 +14,7 @@ so a human can complete them. This honors the template's rule:
 from __future__ import annotations
 import json
 import os
+import urllib.parse
 from datetime import datetime
 from typing import Dict, List, Any
 
@@ -488,8 +489,24 @@ class ReportBuilder:
                 "sources": d.get("sources", []),
             })
 
+        sector_tag = (facts.get("sic") or "").strip() or ctx.get("sector", "").title()
+
+        # Enrich UNC alumni with LinkedIn search URLs and company profile links
+        raw_alumni = c.get("unc_alumni") or []
+        unc_alumni = []
+        for person in raw_alumni:
+            name = person.get("name", "")
+            q = urllib.parse.quote_plus(f"{name} {c['name']}")
+            unc_alumni.append({
+                **person,
+                "linkedin_url": f"https://www.linkedin.com/search/results/people/?keywords={q}",
+                "company_profile_url": facts.get("website") or edgar_url,
+                "edgar_url": edgar_url,
+            })
+
         return {
             "company_name": c["name"],
+            "sector_tag": sector_tag,
             "overview": {"text": overview_text,
                          "sources": [edgar_url, _first_trial_url(c)]},
             "partnership_type": "Strategic" if len(trials) > 5 else "Translational",
@@ -507,6 +524,7 @@ class ReportBuilder:
             "unc_alignment": unc_alignment,
             "what_unc_offers": offers,
             "signals": signals,
+            "unc_alumni": unc_alumni,
         }
 
     def _section5(self, sector: str, companies: List[dict] = None) -> dict:
