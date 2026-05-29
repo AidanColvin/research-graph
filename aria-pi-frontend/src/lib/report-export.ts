@@ -547,7 +547,7 @@ export async function downloadDocx(rawData: any) {
         const img = chartImgs.get(blkIdx);
         if (img) {
           children.push(new Paragraph({
-            children: [new ImageRun({ data: img.bytes, transformation: { width: img.w, height: img.h } })],
+            children: [new ImageRun({ type: 'png', data: img.bytes, transformation: { width: img.w, height: img.h } })],
             spacing: { after: 160 },
           }));
         } else {
