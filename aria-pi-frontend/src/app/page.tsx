@@ -30,6 +30,12 @@ const SECTORS = [
   'Finance', 'Insurance', 'Industrial',
 ];
 
+// How long the dot rests on each line as it travels down. The dot must visibly
+// pass every line before the report is allowed to load (see run()).
+const STAGE_MS = 6500;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 // First sector whose name starts with what's typed (case-insensitive).
 function suggestFor(input: string): string {
   const q = input.trim().toLowerCase();
@@ -44,6 +50,9 @@ export default function Home() {
   const [sector, setSector] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [stageIdx, setStageIdx] = useState(0);
+  // True once the dot has passed every line and we're holding on the last one
+  // (pulsing) until the backend data finishes arriving.
+  const [waiting, setWaiting] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,37 +62,53 @@ export default function Home() {
     setError(null);
     setData(null);
     setStageIdx(0);
+    setWaiting(false);
 
-    // Pace the visible stages to the real backend work (live SEC/PubMed/NIH/
-    // trials fetches take tens of seconds). Advancing slowly keeps the progress
-    // screen honest instead of racing to "done" while data is still loading.
-    const tick = setInterval(() => {
-      setStageIdx((i) => (i < STAGES.length - 1 ? i + 1 : i));
-    }, 10000);
+    // Kick off the real backend fetch immediately, in parallel with the
+    // line-by-line dot animation below. We capture the result here rather than
+    // setting state right away so the report only loads AFTER the dot has
+    // visibly travelled past every line.
+    const result: { data?: ReportData; error?: string } = {};
+    const fetchPromise = (async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 300_000);
+        const res = await fetch('/api/run-pipeline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sector }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error(`Pipeline failed (${res.status})`);
+        const json = await res.json();
+        result.data = json.data as ReportData;
+      } catch (e: any) {
+        result.error = e?.name === 'AbortError'
+          ? 'The engine took too long to respond. Try again or check the backend.'
+          : e?.message ?? 'Something went wrong.';
+      }
+    })();
 
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 300_000);
-      const res = await fetch('/api/run-pipeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) throw new Error(`Pipeline failed (${res.status})`);
-      const json = await res.json();
-      clearInterval(tick);
-      setStageIdx(STAGES.length - 1);
-      setData(json.data as ReportData);
-      setStatus('done');
-    } catch (e: any) {
-      clearInterval(tick);
-      const msg = e?.name === 'AbortError'
-        ? 'The engine took too long to respond. Try again or check the backend.'
-        : e?.message ?? 'Something went wrong.';
-      setError(msg);
+    // Move the black dot down one line at a time — every stage gets its moment
+    // so the user always sees it travel the full list.
+    for (let i = 0; i < STAGES.length; i++) {
+      setStageIdx(i);
+      await sleep(STAGE_MS);
+    }
+
+    // All lines have been passed. Only now do we wait for the data to be ready
+    // (the last dot pulses during any remaining backend time), then load page 3.
+    setWaiting(true);
+    await fetchPromise;
+    setWaiting(false);
+
+    if (result.error) {
+      setError(result.error);
       setStatus('error');
+    } else {
+      setData(result.data ?? null);
+      setStatus('done');
     }
   }
 
@@ -93,6 +118,7 @@ export default function Home() {
     setError(null);
     setSector('');
     setStageIdx(0);
+    setWaiting(false);
   }
 
   // Inline autocomplete: ghost suffix shown after what the user typed.
@@ -182,35 +208,36 @@ export default function Home() {
           <div style={styles.runSector}>{sector}</div>
           <div style={styles.steps}>
             {STAGES.map((s, i) => {
-              const done = i < stageIdx;
+              // The dot trail: every line the dot has reached (current + passed)
+              // is black; lines still ahead are grey. The current line is bold.
+              const reached = i <= stageIdx;
               const active = i === stageIdx;
-              const pending = i > stageIdx;
-              const lastAndWaiting = active && i === STAGES.length - 1;
+              // While holding for the backend, the final dot pulses to show the
+              // report is still being built even though every line is passed.
+              const pulsing = waiting && i === STAGES.length - 1;
               return (
                 <div key={s} style={styles.stepRow}>
                   <div style={{
                     ...styles.stepDot,
-                    background: (done || active) ? '#0a0a0a' : '#e5e5e5',
-                    opacity: lastAndWaiting ? undefined : 1,
-                    animation: lastAndWaiting ? 'pulse 1.2s ease-in-out infinite' : undefined,
+                    background: reached ? '#0a0a0a' : '#e5e5e5',
+                    animation: pulsing ? 'pulse 1.2s ease-in-out infinite' : undefined,
                   }} />
                   <div style={{
                     ...styles.stepText,
-                    color: pending ? '#bdbdbd' : '#0a0a0a',
+                    color: reached ? '#0a0a0a' : '#bdbdbd',
                     fontWeight: active ? 600 : 400,
                   }}>
-                    {s}{done ? ' ✓' : ''}
+                    {s}
                   </div>
                 </div>
               );
             })}
           </div>
-          {stageIdx === STAGES.length - 1 && (
+          {waiting ? (
             <p style={{ ...styles.runHint, color: '#666', marginTop: 28 }}>
-              Compiling {sector} report — assembling up to 22 company profiles, NC-based companies, and UNC partnership data. This can take 2–3 minutes.
+              Compiling {sector} report — assembling up to 22 company profiles, NC-based companies, and UNC partnership data. Almost there.
             </p>
-          )}
-          {stageIdx < STAGES.length - 1 && (
+          ) : (
             <p style={styles.runHint}>
               Pulling live data from SEC EDGAR (financials + filings),
               ClinicalTrials.gov, PubMed, and NIH Reporter across up to 22 companies.
