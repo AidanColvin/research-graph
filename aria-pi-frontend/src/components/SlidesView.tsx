@@ -44,6 +44,13 @@ export default function SlidesView({ data: rawData }: { data: any }) {
         <div style={styles.slide}>{renderSlide(s)}</div>
       </div>
 
+      {s?.notes && (
+        <div style={styles.notes}>
+          <div style={styles.notesLabel}>Speaker notes</div>
+          <p style={styles.notesBody}>{s.notes}</p>
+        </div>
+      )}
+
       <div style={styles.controls}>
         <button onClick={() => go(-1)} disabled={idx === 0} style={styles.navBtn}>← Prev</button>
         <span style={styles.counter}>{idx + 1} / {slides.length}</span>
@@ -109,6 +116,24 @@ function renderSlide(s: Slide) {
       {s.kind === 'bullets' && (
         <ul style={styles.bullets}>{s.items.map((it, i) => <li key={i} style={styles.bullet}>{it}</li>)}</ul>
       )}
+      {s.kind === 'spotlight' && (
+        <div style={styles.spotWrap}>
+          <div style={styles.spotLeft}>
+            <div style={styles.spotTags}>
+              {s.tags.map((t, i) => <span key={i} style={styles.spotTag}>{t}</span>)}
+            </div>
+            <ul style={styles.bullets}>{s.points.map((it, i) => <li key={i} style={styles.bullet}>{it}</li>)}</ul>
+          </div>
+          <div style={styles.spotFacts}>
+            {s.facts.map((f, i) => (
+              <div key={i} style={styles.spotFactRow}>
+                <span style={styles.spotFactLbl}>{f.label}</span>
+                <span style={styles.spotFactVal}>{f.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -169,7 +194,18 @@ const styles: Record<string, React.CSSProperties> = {
   th: { textAlign: 'left', padding: '8px 10px', background: '#0a0a0a', color: '#fff', fontSize: 12, fontWeight: 600 },
   td: { padding: '8px 10px', color: '#1f2937', borderBottom: '1px solid #eee' },
   bullets: { margin: 0, paddingLeft: 22 },
-  bullet: { fontSize: 'clamp(15px, 1.8vw, 20px)', lineHeight: 1.5, color: '#1f2937', marginBottom: 12 },
+  bullet: { fontSize: 'clamp(13px, 1.6vw, 18px)', lineHeight: 1.45, color: '#1f2937', marginBottom: 10 },
+  spotWrap: { display: 'flex', gap: 'clamp(16px, 3vw, 40px)', height: '100%' },
+  spotLeft: { flex: 1, minWidth: 0 },
+  spotTags: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  spotTag: { fontSize: 12, fontWeight: 600, color: '#374151', background: '#f3f4f6', borderRadius: 999, padding: '4px 12px' },
+  spotFacts: { width: 'clamp(180px, 26%, 280px)', flexShrink: 0, alignSelf: 'flex-start' },
+  spotFactRow: { display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid #eee' },
+  spotFactLbl: { fontSize: 13, color: '#777' },
+  spotFactVal: { fontSize: 14, fontWeight: 700, color: '#0a0a0a' },
+  notes: { marginTop: 16, border: '1px solid #eee', borderRadius: 12, background: '#fafafa', padding: '14px 18px' },
+  notesLabel: { fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#b45309', marginBottom: 6 },
+  notesBody: { fontSize: 14, lineHeight: 1.55, color: '#374151' },
   legendRow: { display: 'flex', alignItems: 'center', fontSize: 16, color: '#374151', marginBottom: 10 },
   swatch: { width: 14, height: 14, borderRadius: 3, marginRight: 8, display: 'inline-block' },
   controls: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 18 },
