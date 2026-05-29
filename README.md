@@ -1,4 +1,5 @@
-# ARIA-PI — Automated Research Intelligence for Academic Partnership Intelligence
+# map 
+Automated Research Intelligence for Academic Partnership Intelligence
 
 **Version:** 0.1.0  
 **Maintainer:** Research Intelligence Team — Innovate Carolina / UNC Chapel Hill  
