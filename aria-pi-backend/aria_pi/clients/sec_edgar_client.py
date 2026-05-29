@@ -298,38 +298,104 @@ class SECEdgarClient:
             "shares_outstanding": latest_annual("EntityCommonStockSharesOutstanding", "shares", source=dei),
         }
 
-    def get_unc_alumni_from_proxy(self, proxy_filings: list) -> list:
-        """Fetch DEF 14A proxy statements and return UNC-educated executives/directors."""
+    def get_unc_alumni_from_proxy(self, cik: str, proxy_filings: list) -> list:
+        """Fetch DEF 14A proxy statements and return UNC-educated executives/directors.
+
+        Steps:
+          1. Use EDGAR full-text search to check whether UNC is mentioned in
+             any recent DEF 14A for this company.  If not, skip parsing.
+          2. Resolve directory URLs to the actual .htm document.
+          3. Fetch up to 800 KB and parse line-by-line.
+        """
+        if not cik or not proxy_filings:
+            return []
+
+        # Pre-filter: only parse if EDGAR confirms a UNC mention exists
+        if not self._unc_mentioned_in_proxy(cik):
+            return []
+
         alumni: list = []
         seen: set = set()
         for filing in proxy_filings[:2]:
             url = filing.get('url', '')
             if not url or 'browse-edgar' in url:
                 continue
-            try:
-                r = requests.get(
-                    url,
-                    headers={'User-Agent': USER_AGENT},
-                    timeout=12,
-                    stream=True,
-                )
-                r.raise_for_status()
-                chunks, size = [], 0
-                for chunk in r.iter_content(chunk_size=16_384):
-                    chunks.append(chunk)
-                    size += len(chunk)
-                    if size >= 400_000:
-                        break
-                raw = b''.join(chunks).decode('utf-8', errors='ignore')
-            except Exception as e:
-                print(f'DEF 14A fetch error ({url}): {e}')
+            doc_url = self._resolve_proxy_doc_url(url)
+            if not doc_url or doc_url.lower().endswith('.pdf'):
                 continue
-            for person in _parse_proxy_for_unc(raw, url):
+            raw = self._fetch_proxy_bytes(doc_url, max_bytes=800_000)
+            if not raw:
+                continue
+            for person in _parse_proxy_for_unc(raw, doc_url):
                 key = person['name'].lower().strip()
                 if key and key not in seen:
                     seen.add(key)
                     alumni.append(person)
         return alumni[:8]
+
+    def _unc_mentioned_in_proxy(self, cik: str) -> bool:
+        """Return True if any recent DEF 14A for this CIK mentions UNC."""
+        try:
+            params = {
+                'q': '"University of North Carolina"',
+                'forms': 'DEF 14A',
+                'dateRange': 'custom',
+                'startdt': '2018-01-01',
+                'enddt': date.today().isoformat(),
+            }
+            r = requests.get(self.search_url, headers=HEADERS, timeout=8, params=params)
+            r.raise_for_status()
+            hits = r.json().get('hits', {}).get('hits', []) or []
+            for hit in hits:
+                for c in ((hit.get('_source') or {}).get('ciks') or []):
+                    try:
+                        if str(c) == str(cik):
+                            return True
+                    except (ValueError, TypeError):
+                        continue
+            return False
+        except Exception as e:
+            print(f'UNC proxy pre-filter error: {e}')
+            return True  # on error, attempt parsing anyway
+
+    def _resolve_proxy_doc_url(self, url: str) -> str:
+        """If url is a filing directory, follow it to find the main .htm document."""
+        if not url:
+            return ''
+        if not url.endswith('/'):
+            return url  # already a direct document link
+        try:
+            r = requests.get(url, headers={'User-Agent': USER_AGENT}, timeout=8)
+            r.raise_for_status()
+            # Find .htm links; prefer ones with "proxy" or "def14a" in the name
+            links = re.findall(r'href="([^"]*\.(?:htm|html))"', r.text, re.IGNORECASE)
+            for link in links:
+                low = link.lower()
+                if 'proxy' in low or 'def14a' in low or 'def 14a' in low:
+                    return url.rstrip('/') + '/' + link.lstrip('/')
+            if links:
+                return url.rstrip('/') + '/' + links[0].lstrip('/')
+        except Exception as e:
+            print(f'Proxy index resolve error ({url}): {e}')
+        return ''
+
+    def _fetch_proxy_bytes(self, url: str, max_bytes: int = 800_000) -> str:
+        """Fetch a proxy document, capped at max_bytes, returned as str."""
+        try:
+            r = requests.get(
+                url, headers={'User-Agent': USER_AGENT}, timeout=14, stream=True,
+            )
+            r.raise_for_status()
+            chunks, size = [], 0
+            for chunk in r.iter_content(chunk_size=16_384):
+                chunks.append(chunk)
+                size += len(chunk)
+                if size >= max_bytes:
+                    break
+            return b''.join(chunks).decode('utf-8', errors='ignore')
+        except Exception as e:
+            print(f'DEF 14A fetch error ({url}): {e}')
+            return ''
 
     def _find_cik(self, company_name: str) -> Optional[str]:
         """Resolve a company name → CIK using SEC's official ticker map first,
@@ -446,45 +512,41 @@ _TITLE_RE = [
     (re.compile(r'\bDirector\b', re.I), 'Director'),
 ]
 
+# Words that appear in ALL CAPS in proxy docs but are NOT names
+_PROXY_SKIP = {
+    'CEO', 'CFO', 'COO', 'CTO', 'CMO', 'CSO', 'CLO', 'PHD', 'MBA', 'JD',
+    'UNC', 'SEC', 'EDGAR', 'ANNUAL', 'REPORT', 'PROXY', 'STATEMENT',
+    'BOARD', 'DIRECTORS', 'DIRECTOR', 'COMMITTEE', 'NASDAQ', 'NYSE',
+    'CORP', 'INC', 'LLC', 'LLP', 'USA', 'US', 'AGE', 'CLASS', 'NOMINEE',
+    'OFFICER', 'THE', 'AND', 'FOR', 'OR', 'OF', 'IN', 'AT', 'TO', 'BY',
+    'UNIVERSITY', 'COLLEGE', 'SCHOOL', 'INSTITUTE', 'CORPORATION',
+}
+
 
 def _strip_proxy_html(text: str) -> str:
+    """Strip HTML while preserving paragraph structure via newlines.
+
+    Large-company proxy statements (Microsoft, Alphabet) wrap each bio field
+    in table cells.  If we collapse all tags to spaces the name cell and bio
+    cell become one undifferentiated blob and the name extractor can no longer
+    find the relationship between a person's name and their UNC mention.
+    Converting block-level elements to newlines keeps those boundaries intact.
+    """
     text = re.sub(r'<script[^>]*?>.*?</script>', ' ', text, flags=re.DOTALL | re.IGNORECASE)
     text = re.sub(r'<style[^>]*?>.*?</style>', ' ', text, flags=re.DOTALL | re.IGNORECASE)
+    # Block elements → newline so paragraph structure survives
+    text = re.sub(
+        r'</?(?:p|div|tr|li|h[1-6]|section|article|header|footer)[^>]*?>',
+        '\n', text, flags=re.IGNORECASE,
+    )
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    # Remaining tags → single space
     text = re.sub(r'<[^>]+>', ' ', text)
     text = _html.unescape(text)
     text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r' \n|\n ', '\n', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
-
-
-def _proxy_exec_name(window: str) -> str:
-    # "FirstName [Middle] LastName, age NN" — standard proxy bio opener
-    m = re.search(
-        r'\b([A-Z][a-z]+(?:\s+[A-Z]\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-        r'(?:,?\s+(?:age\s+)?\d{2}\b|\s+\(\d{2}\))',
-        window,
-    )
-    if m:
-        return m.group(1).strip()
-    # ALL-CAPS name (older SEC format)
-    m = re.search(r'\b([A-Z]{2,}(?:\s+[A-Z]{2,}){1,3})\b', window)
-    if m and len(m.group(1)) > 4:
-        return m.group(1).title()
-    # "Mr./Ms./Dr. Name"
-    m = re.search(
-        r'\b(?:Mr\.|Ms\.|Dr\.|Mrs\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b',
-        window,
-    )
-    if m:
-        return m.group(1).strip()
-    return ''
-
-
-def _proxy_exec_title(window: str) -> str:
-    for pat, label in _TITLE_RE:
-        if pat.search(window):
-            return label
-    return ''
 
 
 def _proxy_unc_degree(context: str) -> str:
@@ -494,27 +556,106 @@ def _proxy_unc_degree(context: str) -> str:
     return ''
 
 
-def _parse_proxy_for_unc(html_text: str, source_url: str) -> list:
-    """Return [{name, title, unc_credential, source_url}] for UNC-educated execs."""
-    text = _strip_proxy_html(html_text)
-    results: list = []
-    for m in _UNC_RE.finditer(text):
-        # Require an educational keyword within 200 chars of the UNC mention
-        ctx_start = max(0, m.start() - 200)
-        ctx_end = min(len(text), m.end() + 100)
-        if not _EDU_CTX_RE.search(text[ctx_start:ctx_end]):
+def _proxy_find_name_title(lines_before: list) -> tuple:
+    """Search backwards through lines preceding a UNC mention for a name + title.
+
+    Large-company proxy statements put the name, age, and bio in separate table
+    rows/cells.  After HTML stripping those become separate lines.  Searching
+    the 25 lines immediately before the UNC mention reliably finds the
+    executive whose bio contains that educational reference.
+    """
+    name = title = ''
+    for line in reversed(lines_before[-25:]):
+        line = line.strip()
+        if not line or len(line) < 3:
             continue
-        win_start = max(0, m.start() - 900)
-        win_end = min(len(text), m.end() + 200)
-        window = text[win_start:win_end]
-        name = _proxy_exec_name(window)
+
+        if not name:
+            # "John Smith, age 52"  or  "John Smith (52)"
+            m = re.search(
+                r'\b([A-Z][a-z]+(?:\s+[A-Z]\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+                r'(?:,?\s+(?:age\s+)?\d{2}\b|\s+\(\d{2}\))',
+                line,
+            )
+            if m:
+                name = m.group(1).strip()
+
+        if not name:
+            # ALL-CAPS  "JOHN L. HENNESSY"  "SUNDAR PICHAI"
+            for m in re.finditer(
+                r'\b([A-Z]{2,}(?:\s+(?:[A-Z]\.?\s+)?[A-Z]{2,})+)\b', line
+            ):
+                candidate = m.group(1).strip()
+                words = [w.rstrip('.') for w in candidate.split()]
+                if (len(words) >= 2
+                        and not all(w in _PROXY_SKIP for w in words)
+                        and not re.search(
+                            r'\b(?:UNIVERSITY|SCHOOL|COLLEGE|INSTITUTE|'
+                            r'CORPORATION|COMMITTEE|NASDAQ|NYSE|ANNUAL)\b',
+                            candidate)):
+                    name = candidate.title()
+                    break
+
+        if not name:
+            # "Mr. John Smith"  "Dr. Jane Doe"
+            m = re.search(
+                r'\b(?:Mr\.|Ms\.|Mrs\.|Dr\.)\s+'
+                r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b',
+                line,
+            )
+            if m:
+                name = m.group(1).strip()
+
+        if not title:
+            for pat, label in _TITLE_RE:
+                if pat.search(line):
+                    title = label
+                    break
+
+        if name and title:
+            break
+
+    # Sanity-check: reject names that are actually title phrases
+    if name and re.search(
+        r'^(?:Chief|Vice|Executive|Senior|Independent|Lead|Board)', name
+    ):
+        name = ''
+
+    return name, title
+
+
+def _parse_proxy_for_unc(html_text: str, source_url: str) -> list:
+    """Return [{name, title, unc_credential, source_url}] for UNC-educated execs.
+
+    Works line-by-line after paragraph-preserving HTML stripping so that table-
+    structured bios (Microsoft, Alphabet, etc.) are handled correctly.
+    """
+    text = _strip_proxy_html(html_text)
+    lines = text.splitlines()
+    results: list = []
+    seen_line_idx: set = set()
+
+    for i, line in enumerate(lines):
+        if not _UNC_RE.search(line):
+            continue
+        # Require an educational keyword in the same line or one adjacent line
+        ctx = '\n'.join(lines[max(0, i - 2): i + 3])
+        if not _EDU_CTX_RE.search(ctx):
+            continue
+        # Deduplicate: skip if we already found someone from a nearby line
+        if any(abs(i - prev) <= 4 for prev in seen_line_idx):
+            continue
+        seen_line_idx.add(i)
+
+        name, title = _proxy_find_name_title(lines[:i])
         if not name or len(name.split()) < 2:
             continue
-        title = _proxy_exec_title(window)
-        degree = _proxy_unc_degree(text[ctx_start:ctx_end])
+
+        degree = _proxy_unc_degree(ctx)
         credential = 'UNC Chapel Hill'
         if degree:
             credential += f' — {degree}'
+
         results.append({
             'name': name,
             'title': title or 'Executive / Director',

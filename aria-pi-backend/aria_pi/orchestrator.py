@@ -196,12 +196,13 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
 
-    # Alumni fetch runs after facts — needs the DEF 14A URLs from facts
+    # Alumni fetch runs after facts — needs the CIK and DEF 14A URLs from facts
+    cik = str(results["facts"].get("cik") or "")
     proxy_filings = (results["facts"].get("filings_by_form") or {}).get("DEF 14A", [])
     unc_alumni = safe(
-        lambda: sec.get_unc_alumni_from_proxy(proxy_filings),
+        lambda: sec.get_unc_alumni_from_proxy(cik, proxy_filings),
         "Alumni", [],
-    ) if proxy_filings else []
+    ) if cik else []  # private companies have no CIK → skip entirely
 
     return {
         "name": name,

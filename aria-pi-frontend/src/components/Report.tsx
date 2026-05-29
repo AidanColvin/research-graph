@@ -745,8 +745,9 @@ export default function Report({ data: rawData }: { data: any }) {
                 </div>
               ) : (
                 <p style={styles.alumniEmpty}>
-                  No UNC alumni identified in proxy filings for this company.
-                  {!p.facts?.['cik'] && ' (Private company — no SEC proxy statements available.)'}
+                  {p.facts?.['cik']
+                    ? 'No UNC alumni found in SEC proxy statement biographies for this company.'
+                    : 'Private company — no SEC proxy statements available; alumni data cannot be sourced.'}
                 </p>
               )}
             </div>
