@@ -30,8 +30,8 @@ export function relaxLabels(
 ): PlacedLabel[] {
   const fs = opts.fontSize ?? 11;
   const padX = opts.padX ?? 4;
-  const padY = opts.padY ?? 3;
-  const iter = opts.iterations ?? 90;
+  const padY = opts.padY ?? 4;
+  const iter = opts.iterations ?? 160;
   const charW = opts.charW ?? 0.58;
   const dy0 = opts.dy ?? -12;
 
@@ -55,9 +55,11 @@ export function relaxLabels(
   for (let k = 0; k < iter; k++) {
     for (let i = 0; i < L.length; i++) {
       const a = L[i];
-      // gentle pull toward the desired spot (just above the point)
-      a.cx += (a.x - a.cx) * 0.015;
-      a.cy += (a.y + dy0 - a.cy) * 0.015;
+      // gentle pull toward the desired spot (just above the point). Kept weak so
+      // labels can travel far enough to clear a crowded cluster before it tugs
+      // them back; the leader line keeps them readable once they've moved.
+      a.cx += (a.x - a.cx) * 0.01;
+      a.cy += (a.y + dy0 - a.cy) * 0.01;
       for (let j = i + 1; j < L.length; j++) {
         const b = L[j];
         const dx = b.cx - a.cx;
@@ -65,7 +67,13 @@ export function relaxLabels(
         const ox = (a.w + b.w) / 2 + padX - Math.abs(dx);
         const oy = (a.h + b.h) / 2 + padY - Math.abs(dy);
         if (ox > 0 && oy > 0) {
-          if (ox < oy) {
+          // Favor vertical separation. Stacking labels apart by a line height is
+          // stable regardless of how wide the text is, whereas a sideways nudge
+          // (often the smaller overlap for a row of points) only needs the pull
+          // back and bounds clamp to undo it — which is how rows of labels stay
+          // stuck on top of each other. Only shift horizontally when the labels
+          // are nearly directly above/below one another.
+          if (ox < oy * 0.35) {
             const s = ((dx < 0 ? -1 : 1) * ox) / 2;
             a.cx -= s;
             b.cx += s;
