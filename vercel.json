@@ -1,0 +1,12 @@
+{
+  "framework": null,
+  "buildCommand": "echo 'No build needed at repo root. The Next.js app lives in aria-pi-frontend/ and is served by the aria-pi-frontend Vercel project; this root deployment redirects to it.'",
+  "outputDirectory": "public",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://aria-pi-frontend.vercel.app/:path*",
+      "permanent": false
+    }
+  ]
+}
