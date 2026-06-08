@@ -88,6 +88,41 @@ export function relaxLabels(
     }
   }
 
+  // Phase 2 — guaranteed separation. The force pass above settles the layout but,
+  // with the anchor pull-back fighting it, can leave a few labels still touching
+  // when many points pile onto one spot. This pass drops the pull-back entirely
+  // and pushes any overlapping pair fully apart (favoring vertical stacking),
+  // sweeping until nothing overlaps, so dense clusters always resolve.
+  for (let pass = 0; pass < 80; pass++) {
+    let touched = false;
+    for (let i = 0; i < L.length; i++) {
+      const a = L[i];
+      for (let j = i + 1; j < L.length; j++) {
+        const b = L[j];
+        const dx = b.cx - a.cx;
+        const dy = b.cy - a.cy;
+        const ox = (a.w + b.w) / 2 + padX - Math.abs(dx);
+        const oy = (a.h + b.h) / 2 + padY - Math.abs(dy);
+        if (ox > 0 && oy > 0) {
+          touched = true;
+          if (ox < oy * 0.35) {
+            const s = ((dx < 0 ? -1 : 1) * ox) / 2;
+            a.cx -= s;
+            b.cx += s;
+          } else {
+            const s = ((dy < 0 ? -1 : 1) * (oy + 0.5)) / 2;
+            a.cy -= s;
+            b.cy += s;
+          }
+          clamp(a);
+          clamp(b);
+        }
+      }
+    }
+    if (!touched) break;
+  }
+  L.forEach(clamp);
+
   return L.map((l) => ({
     x: l.x,
     y: l.y,
