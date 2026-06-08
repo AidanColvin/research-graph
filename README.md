@@ -114,17 +114,17 @@ double-sourced is flagged for analyst review rather than guessed.
 
 ```mermaid
 flowchart LR
-    U[Browser] -->|POST sector| NX[Next.js route handlers]
-    NX -->|proxy SSE / JSON| API[FastAPI orchestrator]
-    API -->|parallel fetch| SEC[SEC EDGAR]
-    API --> CT[ClinicalTrials.gov]
-    API --> PM[PubMed E-utilities]
-    API --> NIH[NIH RePORTER]
-    API -->|deterministic build| RB[ReportBuilder]
-    RB -->|JSON report| NX
-    NX -->|render| RPT[Report component]
-    RPT -->|views| VW[Report / Visualize / Trends / Excel / Slides]
-    VW -->|html2canvas + xlsx + pptxgenjs| EX[PDF / Word / Markdown / Excel / PowerPoint]
+    U["Browser"] -->|"POST sector"| NX["Next.js route handlers"]
+    NX -->|"proxy SSE / JSON"| API["FastAPI orchestrator"]
+    API -->|"parallel fetch"| SEC["SEC EDGAR"]
+    API --> CT["ClinicalTrials.gov"]
+    API --> PM["PubMed E-utilities"]
+    API --> NIH["NIH RePORTER"]
+    API -->|"deterministic build"| RB["ReportBuilder"]
+    RB -->|"JSON report"| NX
+    NX -->|"render"| RPT["Report component"]
+    RPT -->|"views"| VW["Report / Visualize / Trends / Excel / Slides"]
+    VW -->|"html2canvas + xlsx + pptxgenjs"| EX["PDF / Word / Markdown / Excel / PowerPoint"]
 ```
 
 **Two independently deployed Vercel projects:**
