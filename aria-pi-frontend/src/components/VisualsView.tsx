@@ -3,7 +3,7 @@
 import React from 'react';
 import { fmtUsd } from '@/components/Report';
 import { computeAnalytics, type CompanyMetrics } from '@/lib/report-analytics';
-import { IsoScatter, OrbitNetwork } from '@/components/Chart3D';
+import { OrbitNetwork } from '@/components/Chart3D';
 import { relaxLabels, truncate, type LabelInput } from '@/lib/chart-labels';
 
 const INDIGO = '#4f46e5';
@@ -32,19 +32,6 @@ export default function VisualsView({ data: rawData }: { data: any }) {
           points={cos.map((c) => ({ label: c.name, size: Math.max(0.05, c.priority / 100), highlight: c.uncTie, weight: c.alignment }))} />
       </Card>
 
-      <Card title="Opportunity matrix" caption="Revenue (log) vs partnership priority. Bubble size = trial programs; filled = existing UNC tie. Quadrants split at the medians.">
-        <OpportunityMatrix cos={cos} />
-      </Card>
-
-      <Card title="3D opportunity landscape" caption="Three dimensions at once: revenue (depth), R&D intensity (across), and partnership priority (height). Indigo spheres have an existing UNC tie. The tallest spheres toward the front-right are the prime targets.">
-        <IsoScatter
-          xLabel="R&D intensity" yLabel="Priority" zLabel="Revenue"
-          points={cos.filter((c) => c.revenue > 0 && c.rdIntensity != null).map((c) => ({
-            x: c.rdIntensity as number, y: c.priority, z: c.revenue, label: c.name, highlight: c.uncTie,
-          }))}
-        />
-      </Card>
-
       <Card title="Revenue by company" caption="Latest reported revenue, largest first. Solid indigo bars mark companies with an existing UNC tie.">
         <RevenueBars cos={cos} />
       </Card>
@@ -59,10 +46,6 @@ export default function VisualsView({ data: rawData }: { data: any }) {
 
       <Card title="Profitability vs R&D intensity" caption="Horizontal = R&D as % of revenue; vertical = net margin %. Dashed line is break-even.">
         <Scatter cos={cos} />
-      </Card>
-
-      <Card title="Financial bubble" caption="Revenue (log) vs net margin, bubble size = R&D spend. Three financial dimensions at once.">
-        <FinancialBubble cos={cos} />
       </Card>
 
       <Card title="Metric correlation matrix" caption="Pairwise Pearson correlation across financial metrics. Indigo = positive, red = negative; deeper = stronger.">
@@ -123,10 +106,6 @@ export default function VisualsView({ data: rawData }: { data: any }) {
 
       <Card title="Leader profiles (radar)" caption="Top three by priority across five normalized dimensions. Each axis is scaled 0-1 against the set.">
         <Radar cos={cos} />
-      </Card>
-
-      <Card title="UNC engagement scatter" caption="Trial programs vs research-alignment signals. Bubble size = priority; filled = existing tie.">
-        <TrialAlign cos={cos} />
       </Card>
 
       <Card title="Engagement funnel" caption="The set narrows from all companies to the actionable shortlist.">
@@ -201,7 +180,6 @@ function RevenueBars({ cos }: { cos: CompanyMetrics[] }) {
   );
 }
 const lin = (v: number, d0: number, d1: number, r0: number, r1: number) => d1 === d0 ? (r0 + r1) / 2 : r0 + ((v - d0) / (d1 - d0)) * (r1 - r0);
-const median = (arr: number[]) => { if (!arr.length) return 0; const a = [...arr].sort((x, y) => x - y); const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
 function ranks(vals: (number | null)[]): (number | null)[] {
   const idx = vals.map((v, i) => ({ v, i })).filter((o) => o.v != null).sort((x, y) => (x.v as number) - (y.v as number));
   const out = vals.map(() => null as number | null);
@@ -228,37 +206,7 @@ function Legend({ items }: { items: { label: string; color: string }[] }) {
   return <div style={st.legend}>{items.map((it, i) => <span key={i} style={st.legendItem}><span style={{ ...st.legendSwatch, background: it.color }} />{it.label}</span>)}</div>;
 }
 
-// ── 1. Opportunity matrix ────────────────────────────────────────────────────
-function OpportunityMatrix({ cos }: { cos: CompanyMetrics[] }) {
-  const pts = cos.filter((c) => c.revenue > 0);
-  if (!pts.length) return <Empty />;
-  const W = 820, H = 480, pl = 64, pr = 24, pt = 24, pb = 48;
-  const xs = pts.map((c) => Math.log10(c.revenue));
-  const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const X = (c: CompanyMetrics) => lin(Math.log10(c.revenue), x0, x1, pl, W - pr);
-  const Y = (c: CompanyMetrics) => lin(c.priority, 0, 100, H - pb, pt);
-  const xMidPx = lin(median(xs), x0, x1, pl, W - pr);
-  const yMidPx = lin(50, 0, 100, H - pb, pt);
-  const labelled = [...pts].sort((a, b) => b.priority - a.priority).slice(0, 6);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
-      <line x1={xMidPx} y1={pt} x2={xMidPx} y2={H - pb} stroke="#eee" />
-      <line x1={pl} y1={yMidPx} x2={W - pr} y2={yMidPx} stroke="#eee" />
-      <text x={W - pr - 4} y={pt + 14} textAnchor="end" style={st.quad}>Pursue now</text>
-      <text x={pl + 4} y={pt + 14} style={st.quad}>Build relationship</text>
-      <text x={W - pr - 4} y={H - pb - 6} textAnchor="end" style={st.quad}>Monitor</text>
-      <text x={pl + 4} y={H - pb - 6} style={st.quad}>Watch</text>
-      <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#ccc" />
-      <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#ccc" />
-      <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>Revenue (log) →</text>
-      <text x={16} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 16 ${(pt + H - pb) / 2})`}>Priority →</text>
-      {pts.map((c, i) => <circle key={i} cx={X(c)} cy={Y(c)} r={5 + Math.min(c.trials, 10) * 1.4} fill={c.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={c.uncTie ? 0.85 : 1} />)}
-      <LabelLayer items={labelled.map((c) => ({ x: X(c), y: Y(c), text: truncate(c.name, 16) }))} bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
-    </svg>
-  );
-}
-
-// ── 2. Heatmap ───────────────────────────────────────────────────────────────
+// ── Heatmap ──────────────────────────────────────────────────────────────────
 function Heatmap({ cos }: { cos: CompanyMetrics[] }) {
   if (!cos.length) return <Empty />;
   const metrics: { label: string; get: (c: CompanyMetrics) => number | null; fmt: (v: number) => string }[] = [
@@ -636,36 +584,7 @@ function Radar({ cos }: { cos: CompanyMetrics[] }) {
   );
 }
 
-// ── 14. Trials vs alignment ──────────────────────────────────────────────────
-function TrialAlign({ cos }: { cos: CompanyMetrics[] }) {
-  const pts = cos.filter((c) => c.trials > 0 || c.alignment > 0);
-  if (!pts.length) return <Empty />;
-  const W = 820, H = 440, pl = 50, pr = 24, pt = 24, pb = 48;
-  const xMax = Math.max(...pts.map((c) => c.trials), 1);
-  const yMax = Math.max(...pts.map((c) => c.alignment), 1);
-  const X = (v: number) => lin(v, 0, xMax, pl, W - pr);
-  const Y = (v: number) => lin(v, 0, yMax, H - pb, pt);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
-      <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#ccc" />
-      <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#ccc" />
-      <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>Trial programs →</text>
-      <text x={14} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 14 ${(pt + H - pb) / 2})`}>UNC alignment →</text>
-      {pts.map((c, i) => {
-        const jx = (i % 3 - 1) * 4, jy = (i % 2 - 0.5) * 6;
-        return (
-          <circle key={i} cx={X(c.trials) + jx} cy={Y(c.alignment) + jy} r={5 + c.priority / 14} fill={c.uncTie ? INDIGO : '#fff'} stroke={INDIGO} strokeWidth={1.5} fillOpacity={c.uncTie ? 0.8 : 1} />
-        );
-      })}
-      <LabelLayer items={pts.map((c, i) => ({ c, jx: (i % 3 - 1) * 4, jy: (i % 2 - 0.5) * 6 }))
-        .filter((o) => o.c.alignment >= 2 || o.c.trials >= 4)
-        .map((o) => ({ x: X(o.c.trials) + o.jx, y: Y(o.c.alignment) + o.jy, text: truncate(o.c.name, 16) }))}
-        bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
-    </svg>
-  );
-}
-
-// ── 15. Funnel ───────────────────────────────────────────────────────────────
+// ── Funnel ───────────────────────────────────────────────────────────────────
 function Funnel({ a }: { a: ReturnType<typeof computeAnalytics> }) {
   const stages = [
     { label: 'All companies', value: a.counts.total },
@@ -715,32 +634,7 @@ function ConnectionNetwork({ cos }: { cos: CompanyMetrics[] }) {
   );
 }
 
-// ── 17. Financial bubble ──────────────────────────────────────────────────────
-function FinancialBubble({ cos }: { cos: CompanyMetrics[] }) {
-  const pts = cos.filter((c) => c.revenue > 0 && c.netMargin != null) as (CompanyMetrics & { netMargin: number })[];
-  if (pts.length < 2) return <Empty />;
-  const W = 820, H = 460, pl = 56, pr = 30, pt = 24, pb = 48;
-  const xs = pts.map((c) => Math.log10(c.revenue));
-  const X = (c: CompanyMetrics) => lin(Math.log10(c.revenue), Math.min(...xs), Math.max(...xs), pl, W - pr);
-  const yMin = Math.min(...pts.map((c) => c.netMargin), 0), yMax = Math.max(...pts.map((c) => c.netMargin), 5);
-  const Y = (v: number) => lin(v, yMin, yMax, H - pb, pt);
-  const maxRd = Math.max(...pts.map((c) => c.rd), 1);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={st.svg}>
-      <line x1={pl} y1={Y(0)} x2={W - pr} y2={Y(0)} stroke="#bbb" strokeDasharray="4 4" />
-      <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#ccc" />
-      <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#ccc" />
-      <text x={(pl + W - pr) / 2} y={H - 10} textAnchor="middle" style={st.axis}>Revenue (log) →</text>
-      <text x={14} y={(pt + H - pb) / 2} textAnchor="middle" style={st.axis} transform={`rotate(-90 14 ${(pt + H - pb) / 2})`}>Net margin % →</text>
-      {pts.map((c, i) => (
-        <circle key={i} cx={X(c)} cy={Y(c.netMargin)} r={5 + Math.sqrt(c.rd / maxRd) * 22} fill={INDIGO} fillOpacity={0.28} stroke={INDIGO} />
-      ))}
-      <LabelLayer items={pts.map((c) => ({ x: X(c), y: Y(c.netMargin), text: truncate(c.name, 14) }))} fontSize={10} bounds={{ minX: pl, maxX: W - pr, minY: pt, maxY: H - pb }} />
-    </svg>
-  );
-}
-
-// ── 18. Revenue Pareto ────────────────────────────────────────────────────────
+// ── Revenue Pareto ───────────────────────────────────────────────────────────
 function Pareto({ cos }: { cos: CompanyMetrics[] }) {
   const items = cos.filter((c) => c.revenue > 0).sort((a, b) => b.revenue - a.revenue);
   if (items.length < 2) return <Empty />;
