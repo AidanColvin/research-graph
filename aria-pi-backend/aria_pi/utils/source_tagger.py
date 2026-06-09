@@ -19,8 +19,11 @@ class SourceTagger:
         Returns: Tuple containing boolean (is_valid) and a list of matched, clean sources.
         """
         clean_sources = [
-            src for src in available_sources 
-            if not any(blocked in src for blocked in self.blocklist)
+            src for src in available_sources
+            # Ignore blank/whitespace-only entries — an empty string is not a
+            # real source and must never count toward the 2-source minimum.
+            if src and src.strip()
+            and not any(blocked in src for blocked in self.blocklist)
         ]
         
         # Enforce the strict 2-source minimum rule

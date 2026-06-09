@@ -1,5 +1,3 @@
-import os
-import yaml
 from pydantic import BaseModel
 
 class Config(BaseModel):
