@@ -7,7 +7,16 @@ mkdir -p "$REPORT_DIR"
 
 echo "==> Using repo root: $REPO_ROOT"
 echo "==> Installing test dependencies..."
-python3 -m pip install --quiet --upgrade pip
+# Upgrading pip is best-effort: some managed/Debian environments ship a pip
+# that cannot self-uninstall (missing RECORD). Don't let that abort the run.
+python3 -m pip install --quiet --upgrade pip || \
+  echo "    (pip self-upgrade skipped; continuing)"
+# Install the app's own runtime deps (if present) plus the test toolchain so
+# every module under test is importable regardless of the base image.
+if [ -f requirements.txt ]; then
+  python3 -m pip install --quiet -r requirements.txt || \
+    echo "    (requirements.txt install reported issues; continuing)"
+fi
 python3 -m pip install --quiet pytest pytest-cov pytest-asyncio httpx
 
 echo "==> Running backend tests..."

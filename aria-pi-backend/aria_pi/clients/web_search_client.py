@@ -1,5 +1,11 @@
 import os
-from tavily import TavilyClient
+
+try:
+    from tavily import TavilyClient
+    HAS_TAVILY = True
+except ImportError:
+    TavilyClient = None
+    HAS_TAVILY = False
 
 class WebSearchClient:
     def __init__(self, api_key: str = None):
@@ -9,11 +15,18 @@ class WebSearchClient:
         Returns: Nothing.
         """
         self.api_key = api_key or os.environ.get("TAVILY_API_KEY")
-        if self.api_key:
-            self.client = TavilyClient(api_key=self.api_key)
+        if self.api_key and HAS_TAVILY:
+            try:
+                self.client = TavilyClient(api_key=self.api_key)
+            except Exception as e:
+                print(f"Tavily init failed, using mock search: {e}")
+                self.client = None
         else:
             self.client = None
-            print("Warning: No Tavily API key. Using free mock search.")
+            if self.api_key and not HAS_TAVILY:
+                print("Warning: tavily package not installed. Using free mock search.")
+            else:
+                print("Warning: No Tavily API key. Using free mock search.")
 
     def search_company_news(self, company_name: str) -> list[dict]:
         """
